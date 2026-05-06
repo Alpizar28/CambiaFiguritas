@@ -127,6 +127,28 @@ Fase 3: Firebase Auth — pendiente de config real del proyecto Firebase.
 - [x] Crear `SyncIndicator` flotante (pendiente / guardando / guardado / error).
 - [x] Integrar status updates en `useAlbumSync`.
 
+## Fase 10 - parcialmente completa
+
+- [x] Configurar **Firebase Hosting** (`firebase.json` con cache headers).
+- [x] Web export pipeline robusto (`npm run build:web` con patch `import.meta` + rehash bundle).
+- [x] **Deploy web exitoso** → https://cambiafiguritas.web.app
+- [x] **Reglas Firestore deployadas**.
+- [x] Configurar **EAS Build** (`eas.json` profiles preview/production).
+- [x] `app.json`: package + bundleId + permiso INTERNET.
+- [x] **Repo GitHub**: https://github.com/Alpizar28/CambiaFiguritas (branch main).
+- [x] README + docs actualizados para handoff entre dispositivos.
+- [ ] Build Android AAB (requiere Play Console).
+- [ ] Metadata store (descripción, screenshots).
+- [ ] Smoke test E2E en build real.
+
+## Persistencia local (fix crítico mid-sesión)
+
+- [x] Instalar `@react-native-async-storage/async-storage`.
+- [x] Wrap `albumStore` con zustand `persist` middleware.
+- [x] Agregar `hasLocalData()` helper.
+- [x] App.tsx: await rehydration antes de decidir hidratar de Firestore.
+- [x] Lógica: local = source of truth, Firestore = backup cross-device.
+
 ## Fase actual
 
-Fase 10: Publicación MVP.
+Fase 10 residual + mejoras detectadas. Ver `tasks/pendientes.md`.
