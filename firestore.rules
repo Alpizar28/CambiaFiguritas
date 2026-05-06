@@ -1,0 +1,60 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // users: perfil público de cada usuario (necesario para mostrar matches y eventos).
+    // Solo el dueño puede crear/editar su documento.
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(uid)
+                    && request.resource.data.uid == uid
+                    && request.resource.data.email is string
+                    && request.resource.data.name is string;
+      allow update: if isOwner(uid)
+                    && request.resource.data.uid == uid;
+      allow delete: if isOwner(uid);
+    }
+
+    // userAlbums: estado del album por usuario. Lectura abierta a usuarios autenticados
+    // (la usa findMatches para iterar sobre todos los albums). Escritura solo del dueño.
+    match /userAlbums/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(uid);
+    }
+
+    // events: eventos públicos creados por usuarios.
+    // Lectura abierta. Crear requiere auth y createdBy == uid del usuario.
+    // Solo el creador puede editar/borrar.
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.createdBy == request.auth.uid
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() > 0
+                    && request.resource.data.title.size() <= 100
+                    && request.resource.data.lat is number
+                    && request.resource.data.lng is number
+                    && request.resource.data.date is string
+                    && request.resource.data.type in ['intercambio', 'meetup', 'tienda'];
+      allow update: if isSignedIn()
+                    && resource.data.createdBy == request.auth.uid
+                    && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if isSignedIn()
+                    && resource.data.createdBy == request.auth.uid;
+    }
+
+    // Por defecto, todo lo demás bloqueado.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
