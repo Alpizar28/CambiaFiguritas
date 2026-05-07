@@ -1,8 +1,12 @@
-import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View } from 'react-native';
 import { useAlbumStore } from '../../store/albumStore';
 import { countries } from '../album/data/countries';
 import { colors, radii, spacing } from '../../constants/theme';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 type CountryRow = {
   countryId: string;
@@ -16,6 +20,7 @@ type CountryRow = {
 export function StatsBreakdown() {
   const getCountryStats = useAlbumStore((s) => s.getCountryStats);
   const statuses = useAlbumStore((s) => s.statuses);
+  const [expanded, setExpanded] = useState(false);
 
   const rows = useMemo<CountryRow[]>(() => {
     return countries.map((c) => {
@@ -41,44 +46,66 @@ export function StatsBreakdown() {
     .sort((a, b) => b.progress - a.progress)
     .slice(0, 5);
 
+  const totalAdvanced = completed.length + almostDone.length + inProgress.length;
+  const isEmpty = totalAdvanced === 0;
+
+  const toggle = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpanded((v) => !v);
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Por país</Text>
+      <Pressable onPress={toggle} style={({ pressed }) => [styles.header, pressed && { opacity: 0.7 }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>Por país</Text>
+          <Text style={styles.summary}>
+            {isEmpty
+              ? 'Marcá figuritas para ver el desglose'
+              : `${completed.length} completos · ${almostDone.length} casi listos · ${inProgress.length} en progreso`}
+          </Text>
+        </View>
+        <Text style={styles.chevron}>{expanded ? '▾' : '▸'}</Text>
+      </Pressable>
 
-      {completed.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>✓ Completos ({completed.length})</Text>
-          <View style={styles.chipRow}>
-            {completed.map((r) => (
-              <View key={r.countryId} style={styles.completedChip}>
-                <Text style={styles.completedChipText}>{r.code}</Text>
+      {expanded ? (
+        <View style={styles.body}>
+          {completed.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>✓ Completos ({completed.length})</Text>
+              <View style={styles.chipRow}>
+                {completed.map((r) => (
+                  <View key={r.countryId} style={styles.completedChip}>
+                    <Text style={styles.completedChipText}>{r.code}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
-        </View>
-      )}
+            </View>
+          )}
 
-      {almostDone.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔥 Casi listos</Text>
-          {almostDone.map((r) => (
-            <Row key={r.countryId} row={r} accentColor={colors.accent} />
-          ))}
-        </View>
-      )}
+          {almostDone.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>🔥 Casi listos</Text>
+              {almostDone.map((r) => (
+                <Row key={r.countryId} row={r} accentColor={colors.accent} />
+              ))}
+            </View>
+          )}
 
-      {inProgress.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📈 En progreso</Text>
-          {inProgress.map((r) => (
-            <Row key={r.countryId} row={r} accentColor={colors.repeated} />
-          ))}
-        </View>
-      )}
+          {inProgress.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>📈 En progreso</Text>
+              {inProgress.map((r) => (
+                <Row key={r.countryId} row={r} accentColor={colors.repeated} />
+              ))}
+            </View>
+          )}
 
-      {completed.length === 0 && almostDone.length === 0 && inProgress.length === 0 && (
-        <Text style={styles.empty}>Marcá figuritas para ver el desglose por país.</Text>
-      )}
+          {isEmpty && (
+            <Text style={styles.empty}>Marcá figuritas para ver el desglose por país.</Text>
+          )}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -110,13 +137,38 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: spacing.md,
+    gap: spacing.sm,
+  },
+  body: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
     gap: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.md,
   },
   title: {
     color: colors.text,
     fontSize: 16,
     fontWeight: '700',
+  },
+  summary: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  chevron: {
+    color: colors.textMuted,
+    fontSize: 16,
+    fontWeight: '700',
+    width: 16,
+    textAlign: 'center',
   },
   section: {
     gap: spacing.sm,

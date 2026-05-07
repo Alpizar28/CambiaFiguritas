@@ -98,6 +98,16 @@ export async function setUserCity(uid: string, raw: string): Promise<void> {
   await updateDoc(doc(db, 'users', uid), { city: trimmed });
 }
 
+export type PrivacyFlags = {
+  privacyHideProgress?: boolean;
+  privacyHideRepeated?: boolean;
+  privacyAnonymous?: boolean;
+};
+
+export async function updatePrivacy(uid: string, flags: PrivacyFlags): Promise<void> {
+  await updateDoc(doc(db, 'users', uid), flags);
+}
+
 export type ReputationVote = 'up' | 'down';
 
 const recordReputationVoteFn = httpsCallable<

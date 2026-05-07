@@ -10,11 +10,12 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../services/firebase';
-import { updateUser } from '../../services/userService';
+import { updateUser, updatePrivacy } from '../../services/userService';
 import { useUserStore } from '../../store/userStore';
 import { useAlbumStore } from '../../store/albumStore';
 import { deleteCurrentAccount } from '../../services/accountService';
@@ -26,7 +27,6 @@ import { shareText } from '../../utils/share';
 import { shareStatsImage } from '../../utils/shareImage';
 import { track } from '../../services/analytics';
 import { StatsBreakdown } from './StatsBreakdown';
-import { ProgressTimeline } from './components/ProgressTimeline';
 import { PremiumCard } from './components/PremiumCard';
 import { Tooltip } from '../../components/Tooltip';
 import { colors, spacing, radii } from '../../constants/theme';
@@ -152,6 +152,23 @@ export function ProfileScreen() {
 
   const isDirty = whatsapp !== (user?.whatsapp ?? '') || city !== (user?.city ?? '');
 
+  const handlePrivacyChange = async (flags: {
+    privacyHideProgress?: boolean;
+    privacyHideRepeated?: boolean;
+    privacyAnonymous?: boolean;
+  }) => {
+    if (!user) return;
+    // Optimistic update
+    setUser({ ...user, ...flags });
+    try {
+      await updatePrivacy(user.uid, flags);
+    } catch (e) {
+      setUser({ ...user });
+      console.error('[updatePrivacy] failed', e);
+      notify('Error', 'No se pudo guardar el cambio de privacidad.');
+    }
+  };
+
   return (
     <View style={{ flex: 1 }}>
       <Tooltip
@@ -238,8 +255,6 @@ export function ProfileScreen() {
 
       <StatsBreakdown />
 
-      <ProgressTimeline />
-
       <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
         <Text style={styles.shareButtonText}>
           {shareFeedback ?? '📤 Compartir mi progreso'}
@@ -264,6 +279,31 @@ export function ProfileScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Privacidad</Text>
+        <Text style={styles.privacyHint}>
+          Controlá qué ven otros usuarios cuando compartís tu link o aparecés en matches.
+        </Text>
+
+        <PrivacyToggle
+          label="Ocultar mi progreso"
+          hint="No muestra cuántas tenés ni cuántas te faltan en tu link público."
+          value={!!user?.privacyHideProgress}
+          onChange={(v) => handlePrivacyChange({ privacyHideProgress: v })}
+        />
+        <PrivacyToggle
+          label="Ocultar mis repetidas"
+          hint="No muestra cuáles repes específicas tenés. Otros igual ven matches potenciales."
+          value={!!user?.privacyHideRepeated}
+          onChange={(v) => handlePrivacyChange({ privacyHideRepeated: v })}
+        />
+        <PrivacyToggle
+          label="Modo anónimo"
+          hint="Tu link público muestra 'Coleccionista' sin nombre, ciudad ni foto."
+          value={!!user?.privacyAnonymous}
+          onChange={(v) => handlePrivacyChange({ privacyAnonymous: v })}
+        />
+
+        <View style={{ height: spacing.md }} />
+
         <RowButton label="Política de Privacidad" onPress={() => setLegalView('privacy')} />
         <RowButton label="Términos de uso" onPress={() => setLegalView('terms')} />
         {Platform.OS !== 'web' ? (
@@ -315,6 +355,33 @@ function StatBox({ label, value, color }: { label: string; value: number; color:
     <View style={styles.statBox}>
       <Text style={[styles.statValue, { color }]}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function PrivacyToggle({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <View style={styles.privacyRow}>
+      <View style={{ flex: 1, paddingRight: spacing.md }}>
+        <Text style={styles.privacyLabel}>{label}</Text>
+        <Text style={styles.privacyToggleHint}>{hint}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ false: colors.border, true: colors.primary }}
+        thumbColor={value ? colors.background : colors.textMuted}
+      />
     </View>
   );
 }
@@ -455,6 +522,31 @@ const styles = StyleSheet.create({
     fontSize: 9,
     textAlign: 'center',
     marginTop: spacing.xs,
+  },
+  privacyHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: spacing.sm,
+  },
+  privacyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: 0,
+    gap: spacing.sm,
+  },
+  privacyLabel: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  privacyToggleHint: {
+    color: colors.textMuted,
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
   },
   editSection: {
     backgroundColor: colors.surface,

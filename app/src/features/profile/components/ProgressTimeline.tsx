@@ -87,7 +87,11 @@ export function ProgressTimeline() {
         {Array.from({ length: BAR_COUNT }).map((_, i) => {
           const stat = stats[stats.length - 1 - (BAR_COUNT - 1 - i)];
           if (!stat) {
-            return <View key={i} style={[styles.bar, { height: 4, opacity: 0.3 }]} />;
+            return (
+              <View key={`empty-${i}`} style={styles.barColumn}>
+                <View style={[styles.bar, { height: 4, opacity: 0.3 }]} />
+              </View>
+            );
           }
           const heightPct = (stat.ownedCount / max) * 100;
           return (
@@ -138,9 +142,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     height: 80,
     gap: 4,
+    width: '100%',
+    overflow: 'hidden',
   },
   barColumn: {
     flex: 1,
+    minWidth: 0,
     height: '100%',
     justifyContent: 'flex-end',
   },

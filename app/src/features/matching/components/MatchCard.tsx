@@ -109,6 +109,15 @@ export function MatchCard({ match, onPress }: Props) {
     if (next) track({ name: 'match_details_opened', params: { matchUid: user.uid } });
   };
 
+  // Privacidad aplicada al renderizar a OTRO user. Si tiene flags activos,
+  // ocultamos identidad / repes específicos. El score y los counts agregados
+  // siguen mostrándose para que el match sea funcional.
+  const isAnonymous = !!user.privacyAnonymous;
+  const hideRepeated = !!user.privacyHideRepeated;
+  const displayName = isAnonymous ? 'Coleccionista' : user.name;
+  const displayPhoto = isAnonymous ? null : user.photoUrl;
+  const displayCity = isAnonymous ? null : user.city;
+
   const cardContent = (
     <>
       {isPerfectTrade ? (
@@ -117,35 +126,35 @@ export function MatchCard({ match, onPress }: Props) {
         </View>
       ) : null}
       <View style={styles.header}>
-        {user.photoUrl ? (
-          <Image source={{ uri: user.photoUrl }} style={styles.avatar} />
+        {displayPhoto ? (
+          <Image source={{ uri: displayPhoto }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, styles.avatarFallback]}>
-            <Text style={styles.avatarLetter}>{user.name?.[0] ?? '?'}</Text>
+            <Text style={styles.avatarLetter}>{isAnonymous ? '?' : (user.name?.[0] ?? '?')}</Text>
           </View>
         )}
         <View style={styles.info}>
           <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>{user.name}</Text>
-            {user.premium ? <Text style={styles.premiumStar}>⭐</Text> : null}
-            {isVerified ? (
+            <Text style={styles.name} numberOfLines={1}>{displayName}</Text>
+            {!isAnonymous && user.premium ? <Text style={styles.premiumStar}>⭐</Text> : null}
+            {!isAnonymous && isVerified ? (
               <View style={styles.verifiedChip}>
                 <Text style={styles.verifiedChipText}>✓ Verificado</Text>
               </View>
             ) : null}
           </View>
           <Text style={styles.city}>
-            {[user.city, distanceKm != null ? formatDistance(distanceKm) : null]
+            {[displayCity, distanceKm != null ? formatDistance(distanceKm) : null]
               .filter(Boolean)
               .join(' · ') || 'Sin ubicación'}
           </Text>
-          {repPercent != null ? (
+          {!isAnonymous && repPercent != null ? (
             <Text style={styles.reputation}>
               👍 {repPercent}% · {repCount} {repCount === 1 ? 'valoración' : 'valoraciones'}
             </Text>
-          ) : (
+          ) : !isAnonymous ? (
             <Text style={styles.reputationNew}>Sin valoraciones aún</Text>
-          )}
+          ) : null}
         </View>
         <View style={styles.scoreBadge}>
           <Text style={styles.scoreNumber}>{score}</Text>
@@ -166,22 +175,30 @@ export function MatchCard({ match, onPress }: Props) {
 
       {expanded ? (
         <View style={styles.detailsBlock}>
-          <DetailSection
-            title="Te puedo dar (mis repes que necesitan)"
-            color={colors.repeated}
-            groups={theyNeedGrouped}
-            totalShown={theyNeedIds.length}
-            totalReal={theyNeedFromMe}
-            emptyMsg="No tenés repes que les sirvan."
-          />
-          <DetailSection
-            title="Necesito (sus repes que me faltan)"
-            color={colors.owned}
-            groups={iNeedGrouped}
-            totalShown={iNeedIds.length}
-            totalReal={iNeedFromThem}
-            emptyMsg="No tienen repes que te sirvan."
-          />
+          {hideRepeated ? (
+            <Text style={styles.privacyNotice}>
+              🔒 Este usuario eligió no mostrar las repes específicas. Los counts arriba siguen siendo reales.
+            </Text>
+          ) : (
+            <>
+              <DetailSection
+                title="Te puedo dar (mis repes que necesitan)"
+                color={colors.repeated}
+                groups={theyNeedGrouped}
+                totalShown={theyNeedIds.length}
+                totalReal={theyNeedFromMe}
+                emptyMsg="No tenés repes que les sirvan."
+              />
+              <DetailSection
+                title="Necesito (sus repes que me faltan)"
+                color={colors.owned}
+                groups={iNeedGrouped}
+                totalShown={iNeedIds.length}
+                totalReal={iNeedFromThem}
+                emptyMsg="No tienen repes que te sirvan."
+              />
+            </>
+          )}
         </View>
       ) : null}
 
@@ -529,6 +546,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontStyle: 'italic',
     marginTop: 4,
+  },
+  privacyNotice: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontStyle: 'italic',
+    lineHeight: 16,
+    paddingVertical: spacing.xs,
   },
   waButton: {
     backgroundColor: '#25D366',

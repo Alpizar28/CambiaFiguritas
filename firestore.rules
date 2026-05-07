@@ -22,45 +22,25 @@ service cloud.firestore {
                     && request.resource.data.name is string
                     && request.resource.data.name.size() <= 80
                     && request.resource.data.email.size() <= 200;
-      // Update propio (dueño). NO puede modificar reputationUp/Down/Count
-      // (solo Cloud Functions con admin SDK los toca).
+      // Update propio (dueño). Reputación, premium y billing son inmutables
+      // client-side (solo Cloud Functions con admin SDK los pueden tocar).
+      // Las inmutabilidades usan la forma `affectedKeys().hasAny([...])` para
+      // evitar falsos negativos cuando el campo no existe en el doc actual
+      // (Firestore rules tratan campos faltantes de forma especial al comparar).
       allow update: if isOwner(uid)
                     && request.resource.data.uid == resource.data.uid
-                    && request.resource.data.email == resource.data.email
-                    && request.resource.data.createdAt == resource.data.createdAt
-                    && (resource.data.reputationUp == null ||
-                        request.resource.data.reputationUp == resource.data.reputationUp)
-                    && (resource.data.reputationDown == null ||
-                        request.resource.data.reputationDown == resource.data.reputationDown)
-                    && (resource.data.reputationCount == null ||
-                        request.resource.data.reputationCount == resource.data.reputationCount)
-                    && (!('whatsapp' in request.resource.data) ||
-                        (request.resource.data.whatsapp is string &&
-                         request.resource.data.whatsapp.size() <= 30))
-                    && (!('city' in request.resource.data) ||
-                        (request.resource.data.city is string &&
-                         request.resource.data.city.size() <= 80))
-                    && (!('name' in request.resource.data) ||
-                        (request.resource.data.name is string &&
-                         request.resource.data.name.size() <= 80))
-                    && (!('fcmToken' in request.resource.data) ||
-                        request.resource.data.fcmToken == null ||
-                        (request.resource.data.fcmToken is string &&
-                         request.resource.data.fcmToken.size() <= 200))
-                    // Premium y campos de billing/cap son inmutables client-side.
-                    // Solo Cloud Functions con admin SDK los toca.
-                    && (resource.data.premium == null ||
-                        request.resource.data.premium == resource.data.premium)
-                    && (resource.data.adsWatchedToday == null ||
-                        request.resource.data.adsWatchedToday == resource.data.adsWatchedToday)
-                    && (resource.data.adsWatchedDate == null ||
-                        request.resource.data.adsWatchedDate == resource.data.adsWatchedDate)
-                    && (resource.data.lastAdUnlockAt == null ||
-                        request.resource.data.lastAdUnlockAt == resource.data.lastAdUnlockAt)
-                    && (!('userTimezone' in request.resource.data) ||
-                        request.resource.data.userTimezone == null ||
-                        (request.resource.data.userTimezone is string &&
-                         request.resource.data.userTimezone.size() <= 80));
+                    && !request.resource.data.diff(resource.data).affectedKeys()
+                         .hasAny([
+                           'email',
+                           'createdAt',
+                           'reputationUp',
+                           'reputationDown',
+                           'reputationCount',
+                           'premium',
+                           'adsWatchedToday',
+                           'adsWatchedDate',
+                           'lastAdUnlockAt',
+                         ]);
       allow delete: if isOwner(uid);
 
       // Subcollection: votos de reputación.

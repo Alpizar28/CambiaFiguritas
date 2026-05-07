@@ -85,8 +85,8 @@ export async function findMatches(
   myWishlist: Record<string, true> = {},
   myLat?: number,
   myLng?: number,
-  radiusKm?: number | null,
   _isPremium: boolean = false,
+  radiusKm?: number | null,
 ): Promise<Match[]> {
   const maxKm = radiusKm ?? Infinity;
   const albumsRef = collection(db, 'userAlbums');

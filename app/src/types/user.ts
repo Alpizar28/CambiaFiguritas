@@ -19,4 +19,9 @@ export type AppUser = {
   adsWatchedToday?: number;
   adsWatchedDate?: string;
   lastAdUnlockAt?: number;
+  // Controles de privacidad. Los aplican otros clientes al renderizar tu data.
+  // Si están en true, ocultan información cuando otros usuarios te ven.
+  privacyHideProgress?: boolean;
+  privacyHideRepeated?: boolean;
+  privacyAnonymous?: boolean;
 };

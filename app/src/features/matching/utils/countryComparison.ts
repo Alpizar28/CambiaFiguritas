@@ -1,4 +1,4 @@
-import { allStickers } from '../../album/data/mockAlbum';
+import { allStickers } from '../../album/data/albumCatalog';
 import { countries } from '../../album/data/countries';
 import type { StickerStatus, StickerStatusMap } from '../../album/types';
 
