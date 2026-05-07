@@ -251,7 +251,7 @@ export function AlbumScreen() {
 
           {/* Barra de progreso compacta inline */}
           <View style={styles.mobileProgressBar}>
-            <View style={[styles.mobileProgressFill, { width: `${stats.progress}%` as any }]} />
+            <View style={[styles.mobileProgressFill, { width: `${Math.min(100, Math.max(0, stats.progress))}%` as any }]} />
           </View>
 
           {searchOpen && (
