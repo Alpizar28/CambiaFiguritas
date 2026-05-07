@@ -19,6 +19,7 @@ import { useAlbumStore } from '../../store/albumStore';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { shareText } from '../../utils/share';
 import { track } from '../../services/analytics';
+import { StatsBreakdown } from './StatsBreakdown';
 import { colors, spacing, radii } from '../../constants/theme';
 
 export function ProfileScreen() {
@@ -135,6 +136,8 @@ export function ProfileScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      <StatsBreakdown />
 
       <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
         <Text style={styles.shareButtonText}>📤 Compartir mi progreso</Text>

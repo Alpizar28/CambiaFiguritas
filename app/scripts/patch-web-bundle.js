@@ -39,3 +39,32 @@ for (const oldName of files) {
 
 fs.writeFileSync(htmlPath, html);
 console.log('[patch-web-bundle] index.html actualizado.');
+
+// Copiar PWA assets (manifest + sw + favicon icons usables como icon-192/512) a dist root.
+const webDir = path.resolve(__dirname, '..', 'web');
+const pwaFiles = ['manifest.json', 'sw.js'];
+for (const f of pwaFiles) {
+  const src = path.join(webDir, f);
+  if (fs.existsSync(src)) {
+    fs.copyFileSync(src, path.join(distDir, f));
+    console.log(`[patch-web-bundle] copiado ${f}`);
+  }
+}
+
+// Generar icon-192.png e icon-512.png a partir del icon.png si existen como assets.
+// Por ahora, copiar el favicon como fallback. Si no hay íconos PWA, los warnings de Lighthouse aparecen
+// pero el manifest sigue siendo válido.
+const assetsDir = path.resolve(__dirname, '..', 'assets');
+const iconCandidates = [
+  { src: 'icon.png', dst: 'icon-512.png' },
+  { src: 'icon.png', dst: 'icon-192.png' },
+  { src: 'adaptive-icon.png', dst: 'icon-maskable-512.png' },
+];
+for (const { src, dst } of iconCandidates) {
+  const srcPath = path.join(assetsDir, src);
+  const dstPath = path.join(distDir, dst);
+  if (fs.existsSync(srcPath) && !fs.existsSync(dstPath)) {
+    fs.copyFileSync(srcPath, dstPath);
+    console.log(`[patch-web-bundle] copiado ${src} -> ${dst}`);
+  }
+}

@@ -19,6 +19,7 @@ import { LoginScreen } from './src/features/auth/LoginScreen';
 import { OnboardingScreen } from './src/features/onboarding/OnboardingScreen';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { SyncIndicator } from './src/components/SyncIndicator';
+import { InstallPrompt } from './src/components/InstallPrompt';
 import { colors } from './src/constants/theme';
 
 function AppWithSync() {
@@ -27,6 +28,7 @@ function AppWithSync() {
     <>
       <AppNavigator />
       <SyncIndicator />
+      <InstallPrompt />
     </>
   );
 }

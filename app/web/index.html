@@ -7,7 +7,18 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#0A0A0A" />
-    <title>CambiaFiguritas</title>
+    <meta name="description" content="Tu album del Mundial 2026. Encontra matches e intercambia figuritas." />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <meta property="og:title" content="CambiaFiguritas — Album Mundial 2026" />
+    <meta property="og:description" content="Tu album del Mundial 2026. Encontra matches e intercambia figuritas." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://cambiafiguritas.web.app" />
+    <meta property="og:image" content="https://cambiafiguritas.web.app/icon-512.png" />
+    <meta name="twitter:card" content="summary" />
+    <title>CambiaFiguritas — Album Mundial 2026</title>
     <style>
       html {
         background-color: #0A0A0A;
@@ -34,5 +45,12 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').catch(function () {});
+        });
+      }
+    </script>
   </body>
 </html>

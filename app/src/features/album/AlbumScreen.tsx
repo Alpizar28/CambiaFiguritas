@@ -314,12 +314,18 @@ export function AlbumScreen() {
               {stickerGroups.map((group, index) => {
                 const isActive = index === activeGroupIndex;
                 const groupStats = getGroupStats(group.stickers, statuses);
+                const isComplete = groupStats.total > 0 && groupStats.owned === groupStats.total;
                 return (
                   <Pressable
                     key={group.country.id}
                     onPress={() => { haptic.tap(); setActiveGroupIndex(index); }}
-                    style={[styles.countryButton, isActive && styles.countryButtonActive]}
+                    style={[
+                      styles.countryButton,
+                      isActive && styles.countryButtonActive,
+                      isComplete && !isActive && styles.countryButtonComplete,
+                    ]}
                   >
+                    {isComplete && <Text style={styles.completeBadge}>✓</Text>}
                     <Text style={[styles.countryButtonText, isActive && styles.countryButtonTextActive]}>
                       {group.country.code}
                     </Text>
@@ -783,6 +789,18 @@ const styles = StyleSheet.create({
   countryButtonActive: {
     backgroundColor: '#FFD600',
     borderColor: '#FFD600',
+  },
+  countryButtonComplete: {
+    borderColor: '#00C853',
+    backgroundColor: 'rgba(0,200,83,0.15)',
+  },
+  completeBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 4,
+    color: '#00C853',
+    fontSize: 10,
+    fontWeight: '900',
   },
   countryButtonText: {
     color: '#B0B0B0',
