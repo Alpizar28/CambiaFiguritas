@@ -53,3 +53,8 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Firestore tests
+firestore-tests/node_modules/
+firestore-debug.log
+firebase-debug.log
