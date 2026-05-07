@@ -14,6 +14,10 @@ export async function loadUserAlbum(uid: string): Promise<AlbumSnapshot | null> 
   return snap.data() as AlbumSnapshot;
 }
 
+export async function loadOtherUserAlbum(uid: string): Promise<AlbumSnapshot | null> {
+  return loadUserAlbum(uid);
+}
+
 export async function saveUserAlbum(
   uid: string,
   statuses: StickerStatusMap,

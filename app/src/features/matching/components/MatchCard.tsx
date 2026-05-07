@@ -1,15 +1,19 @@
-import { View, Text, Image, TouchableOpacity, StyleSheet, Linking } from 'react-native';
+import { View, Text, Image, TouchableOpacity, Pressable, StyleSheet, Linking } from 'react-native';
 import type { Match } from '../../../services/matchingService';
 import { formatDistance } from '../../../utils/distance';
 import { track } from '../../../services/analytics';
 import { colors, spacing, radii } from '../../../constants/theme';
 
-type Props = { match: Match };
+type Props = {
+  match: Match;
+  onPress?: () => void;
+};
 
-export function MatchCard({ match }: Props) {
+export function MatchCard({ match, onPress }: Props) {
   const { user, iNeedFromThem, theyNeedFromMe, score, distanceKm } = match;
 
-  const openWhatsApp = () => {
+  const openWhatsApp = (e?: { stopPropagation?: () => void }) => {
+    e?.stopPropagation?.();
     const phone = user.whatsapp?.replace(/\D/g, '');
     const msg = encodeURIComponent('Hola! Te vi en CambiaFiguritas, ¿intercambiamos figuritas del Mundial?');
     track({ name: 'match_whatsapp_clicked', params: { matchUid: user.uid } });
@@ -17,7 +21,11 @@ export function MatchCard({ match }: Props) {
   };
 
   return (
-    <View style={styles.card}>
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      style={({ pressed }) => [styles.card, pressed && onPress ? styles.cardPressed : null]}
+    >
       <View style={styles.header}>
         {user.photoUrl ? (
           <Image source={{ uri: user.photoUrl }} style={styles.avatar} />
@@ -50,7 +58,13 @@ export function MatchCard({ match }: Props) {
           <Text style={styles.waText}>Contactar por WhatsApp</Text>
         </TouchableOpacity>
       ) : null}
-    </View>
+
+      {onPress ? (
+        <View style={styles.viewMore}>
+          <Text style={styles.viewMoreText}>Ver perfil y comparar →</Text>
+        </View>
+      ) : null}
+    </Pressable>
   );
 }
 
@@ -68,6 +82,18 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     padding: spacing.md,
     gap: spacing.sm,
+  },
+  cardPressed: {
+    opacity: 0.85,
+  },
+  viewMore: {
+    alignSelf: 'flex-end',
+    marginTop: spacing.xs,
+  },
+  viewMoreText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
   },
   header: {
     flexDirection: 'row',

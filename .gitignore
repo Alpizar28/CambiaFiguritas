@@ -49,6 +49,11 @@ Thumbs.db
 # Firebase deploy cache
 .firebase/
 
+# Service account keys — NUNCA commitear
+service-account.json
+service-account-*.json
+*.firebase-adminsdk.json
+
 # Editor
 .vscode/
 .idea/

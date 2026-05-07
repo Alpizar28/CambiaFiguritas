@@ -8,8 +8,8 @@ type Props = { events: AppEvent[] };
 export function EventsMapWeb({ events }: Props) {
   const bbox = useMemo(() => {
     if (events.length === 0) {
-      // Default Buenos Aires
-      return '-58.5,-34.7,-58.3,-34.5';
+      // Default San José, Costa Rica
+      return '-84.18,9.83,-83.98,10.03';
     }
     const lats = events.map((e) => e.lat);
     const lngs = events.map((e) => e.lng);

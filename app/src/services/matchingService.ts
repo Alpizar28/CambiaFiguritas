@@ -38,8 +38,23 @@ function computeScore(
   return { iNeedFromThem, theyNeedFromMe };
 }
 
+// Bucketea coordenadas a múltiplos de 0.05° (~5 km de precisión) por privacidad.
+// El mapa muestra un área aproximada, no un pin sobre la casa exacta.
+const COORD_BUCKET = 0.05;
+function bucketCoord(n: number): number {
+  return Math.round(n / COORD_BUCKET) * COORD_BUCKET;
+}
+
+// Default histórico (100 km). Lo conserva matchStore. Si el llamador pasa
+// `radiusKm = null` no aplica filtro por distancia. Si no se conoce la distancia
+// (algún user sin GPS), el match se mantiene siempre.
+export const MATCH_MAX_KM = 100;
+
 export async function saveUserLocation(uid: string, lat: number, lng: number): Promise<void> {
-  await updateDoc(doc(db, 'users', uid), { lat, lng });
+  await updateDoc(doc(db, 'users', uid), {
+    lat: bucketCoord(lat),
+    lng: bucketCoord(lng),
+  });
 }
 
 export async function findMatches(
@@ -47,7 +62,9 @@ export async function findMatches(
   myStatuses: StickerStatusMap,
   myLat?: number,
   myLng?: number,
+  radiusKm?: number | null,
 ): Promise<Match[]> {
+  const maxKm = radiusKm ?? Infinity;
   const albumsRef = collection(db, 'userAlbums');
   const snap = await getDocs(query(albumsRef, limit(50)));
 
@@ -81,6 +98,8 @@ export async function findMatches(
       myLat != null && myLng != null && user.lat != null && user.lng != null
         ? haversineKm(myLat, myLng, user.lat, user.lng)
         : null;
+    // Filtrar matches lejanos: si conocemos la distancia y supera el radio elegido, descartar.
+    if (distanceKm != null && distanceKm > maxKm) return;
     matches.push({
       user,
       iNeedFromThem: m.iNeedFromThem,

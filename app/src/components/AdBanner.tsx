@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { adUnitIds } from '../services/ads';
+import { initAdsConsent, shouldRequestNonPersonalizedAdsOnly } from '../services/adsConsent';
 
 type Props = {
   inline?: boolean;
@@ -30,6 +31,8 @@ function NativeAd({ inline }: Props) {
         const init = mod.default;
         if (!initialized) {
           await init().initialize();
+          // El flujo UMP debe correr ANTES de pedir el primer ad para cumplir GDPR.
+          await initAdsConsent();
           initialized = true;
         }
         if (!cancelled) {
@@ -51,7 +54,7 @@ function NativeAd({ inline }: Props) {
       <BannerAd
         unitId={adUnitIds.banner}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
-        requestOptions={{ requestNonPersonalizedAdsOnly: false }}
+        requestOptions={{ requestNonPersonalizedAdsOnly: shouldRequestNonPersonalizedAdsOnly() }}
       />
     </View>
   );

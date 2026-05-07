@@ -12,6 +12,7 @@ import { loadUserAlbum } from './src/services/albumSyncService';
 import { identify, track } from './src/services/analytics';
 import { useUserStore } from './src/store/userStore';
 import { useAlbumStore } from './src/store/albumStore';
+import { useMatchStore } from './src/store/matchStore';
 import { useAlbumSync } from './src/hooks/useAlbumSync';
 import { AppNavigator } from './src/app/AppNavigator';
 import { LoginScreen } from './src/features/auth/LoginScreen';
@@ -80,6 +81,7 @@ export default function App() {
         track({ name: 'logout' });
         identify(null);
         resetAlbum();
+        useMatchStore.getState().resetMatches();
         setUser(null);
       }
       setLoading(false);

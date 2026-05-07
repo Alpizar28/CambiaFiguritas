@@ -13,12 +13,13 @@ service cloud.firestore {
 
     // users: perfil público de cada usuario (necesario para mostrar matches y eventos).
     // Solo el dueño puede crear/editar su documento.
+    // El email NO se persiste acá (es PII y el doc es lectura pública). Vive solo en Firebase Auth.
     match /users/{uid} {
       allow read: if isSignedIn();
       allow create: if isOwner(uid)
                     && request.resource.data.uid == uid
-                    && request.resource.data.email is string
-                    && request.resource.data.name is string;
+                    && request.resource.data.name is string
+                    && !('email' in request.resource.data);
       allow update: if isOwner(uid)
                     && request.resource.data.uid == uid;
       allow delete: if isOwner(uid);
@@ -50,6 +51,18 @@ service cloud.firestore {
                     && request.resource.data.createdBy == resource.data.createdBy;
       allow delete: if isSignedIn()
                     && resource.data.createdBy == request.auth.uid;
+    }
+
+    // reports: reportes de usuarios. Solo se pueden crear; lectura/edición sólo desde admin/backend.
+    match /reports/{reportId} {
+      allow create: if isSignedIn()
+                    && request.resource.data.reporterUid == request.auth.uid
+                    && request.resource.data.targetUid is string
+                    && request.resource.data.targetUid.size() > 0
+                    && request.resource.data.reason is string
+                    && request.resource.data.reason.size() > 0
+                    && request.resource.data.reason.size() <= 500;
+      allow read, update, delete: if false;
     }
 
     // Por defecto, todo lo demás bloqueado.

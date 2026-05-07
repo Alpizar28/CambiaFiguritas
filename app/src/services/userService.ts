@@ -1,6 +1,10 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import type { AppUser } from '../types/user';
+
+// El doc `users/{uid}` es de lectura pública para usuarios logueados (lo lee
+// findMatches y MatchProfileScreen). No debe contener PII como email.
+// El email vive solo en Firebase Auth — la UI propia lo lee de auth.currentUser.
 
 export async function getOrCreateUser(
   uid: string,
@@ -12,19 +16,28 @@ export async function getOrCreateUser(
   const snap = await getDoc(ref);
 
   if (snap.exists()) {
-    return snap.data() as AppUser;
+    const data = snap.data() as Record<string, unknown>;
+    if ('email' in data) {
+      // Cleanup retroactivo: borrar email de docs viejos que sí lo guardaban.
+      try {
+        await updateDoc(ref, { email: deleteField() });
+      } catch {
+        // Si falla, no rompemos el login. Eventualmente otro intento limpiará.
+      }
+      delete data.email;
+    }
+    return { ...(data as Omit<AppUser, 'email'>), email } as AppUser;
   }
 
-  const newUser: AppUser = {
+  const persisted = {
     uid,
     name,
-    email,
     photoUrl,
     city: '',
     premium: false,
     createdAt: new Date().toISOString(),
   };
 
-  await setDoc(ref, newUser);
-  return newUser;
+  await setDoc(ref, persisted);
+  return { ...persisted, email };
 }

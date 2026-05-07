@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Platform,
+  Pressable,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
@@ -13,6 +14,8 @@ import { makeRedirectUri } from 'expo-auth-session';
 import { GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
 import { auth } from '../../services/firebase';
 import { colors, spacing, radii } from '../../constants/theme';
+import { LegalModal } from '../profile/LegalModal';
+import { PRIVACY_TEXT, TERMS_TEXT } from '../profile/legalContent';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -20,9 +23,12 @@ const WEB_CLIENT_ID = '1058576446766-r6ktjd5ptkg0h44trgc0a2lbab3001r8.apps.googl
 
 const redirectUri = makeRedirectUri({ scheme: 'cambiafiguritas' });
 
+type LegalView = null | 'privacy' | 'terms';
+
 export function LoginScreen() {
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [legalView, setLegalView] = useState<LegalView>(null);
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: WEB_CLIENT_ID,
@@ -96,7 +102,30 @@ export function LoginScreen() {
             <Text style={styles.buttonText}>Continuar con Google</Text>
           )}
         </TouchableOpacity>
+        <Text style={styles.legalNote}>
+          Al continuar aceptás nuestra{' '}
+          <Pressable onPress={() => setLegalView('privacy')} hitSlop={4}>
+            <Text style={styles.legalLink}>Política de Privacidad</Text>
+          </Pressable>
+          {' '}y los{' '}
+          <Pressable onPress={() => setLegalView('terms')} hitSlop={4}>
+            <Text style={styles.legalLink}>Términos de uso</Text>
+          </Pressable>
+          .
+        </Text>
       </View>
+      <LegalModal
+        visible={legalView === 'privacy'}
+        title="Política de Privacidad"
+        body={PRIVACY_TEXT}
+        onClose={() => setLegalView(null)}
+      />
+      <LegalModal
+        visible={legalView === 'terms'}
+        title="Términos de uso"
+        body={TERMS_TEXT}
+        onClose={() => setLegalView(null)}
+      />
     </View>
   );
 }
@@ -152,5 +181,18 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: 14,
     textAlign: 'center',
+  },
+  legalNote: {
+    color: colors.textMuted,
+    fontSize: 10,
+    textAlign: 'center',
+    lineHeight: 14,
+    marginTop: spacing.xs,
+  },
+  legalLink: {
+    color: colors.primary,
+    fontSize: 10,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 });

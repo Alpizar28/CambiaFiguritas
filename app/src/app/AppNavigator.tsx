@@ -7,7 +7,7 @@ import { colors } from '../constants/theme';
 import { track } from '../services/analytics';
 import { AlbumScreen } from '../features/album/AlbumScreen';
 import { EventsScreen } from '../features/events/EventsScreen';
-import { MatchesScreen } from '../features/matching/MatchesScreen';
+import { MatchesNavigator } from '../features/matching/MatchesNavigator';
 import { ProfileScreen } from '../features/profile/ProfileScreen';
 import { AlbumIcon, EventsIcon, MatchesIcon, ProfileIcon } from '../components/icons/TabIcons';
 import type { RootTabParamList } from '../types/navigation';
@@ -80,7 +80,7 @@ export function AppNavigator() {
         />
         <Tab.Screen
           name="Matches"
-          component={MatchesScreen}
+          component={MatchesNavigator}
           options={{ title: 'Matches' }}
         />
         <Tab.Screen

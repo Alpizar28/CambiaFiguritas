@@ -149,6 +149,48 @@ Fase 3: Firebase Auth — pendiente de config real del proyecto Firebase.
 - [x] App.tsx: await rehydration antes de decidir hidratar de Firestore.
 - [x] Lógica: local = source of truth, Firestore = backup cross-device.
 
+## Fase 11 — Perfil de match con comparación colapsable
+
+- [x] Instalar `@react-navigation/native-stack` y `expo-clipboard`.
+- [x] Stack navigator interno para Matches (`MatchesNavigator`).
+- [x] Tipos `MatchesStackParamList` en `src/types/navigation.ts`.
+- [x] Helper `loadOtherUserAlbum(uid)` en `albumSyncService.ts`.
+- [x] Util puro `countryComparison.ts` (build + summarize, ordenado por relevancia).
+- [x] Util `profileActions.ts` (WhatsApp pre-armado, copy, mapa, reportar).
+- [x] Componente `CompareBars` (barras horizontales).
+- [x] Componente `CountryCompareRow` (header colapsable + chips ARG3/MEX1...).
+- [x] Pantalla `MatchProfileScreen` (header + acciones + lista + estados).
+- [x] `MatchCard` con `onPress` opcional → navega a perfil; CTA "Ver perfil y comparar".
+- [x] Eventos analytics: `match_profile_opened`, `match_map_clicked`, `match_clipboard_copied`, `match_reported`.
+- [x] Reglas Firestore: nueva colección `reports/` con create-only validado.
+- [x] Doc `tasks/firestore-rules.md` actualizado con `reports`.
+- [ ] Re-deploy de reglas: `firebase deploy --only firestore:rules`.
+- [ ] Smoke test con dos cuentas: navegar match → comparar → WhatsApp → copiar → mapa → reportar.
+
+## Fase 12 — Privacidad MVP
+
+- [x] `email` removido del doc público `users/{uid}`. Cleanup retroactivo en `getOrCreateUser`.
+- [x] `AppUser.email` opcional. ProfileScreen sigue leyéndolo (viene de Auth via `getOrCreateUser`).
+- [x] Reglas Firestore: prohibir `email` en create de `users/{uid}`.
+- [x] `saveUserLocation` bucketea lat/lng a 0.05° (~5km).
+- [x] `openMapsForUser` prioriza ciudad texto sobre coords; coord fallback usa zoom 12.
+- [x] Babel plugin para `import.meta` (fix dev web blanco).
+- [ ] Re-deploy de reglas (sin esto, logins nuevos fallan).
+- [x] Script masivo de cleanup email: `scripts/cleanup-emails.js` (Admin SDK, requiere service-account.json).
+
+## Fase 13 — Privacidad full
+
+- [x] `docs/PRIVACY.md` y `docs/TERMS.md` escritos.
+- [x] `LegalModal` + `legalContent.ts` con texto embebido. Linkeado desde Login y Profile.
+- [x] Eliminar cuenta: `accountService.deleteCurrentAccount` borra eventos creados, userAlbum, user doc y auth user. Botón en Profile.
+- [x] UMP AdMob consent: `services/adsConsent.ts` corre antes del primer ad. Botón "Configurar publicidad" en Profile (solo nativo).
+- [x] AdBanner usa `requestNonPersonalizedAdsOnly` según consentimiento.
+- [x] Hash SHA-256 de `matchUid`/`targetUid` en analytics (`expo-crypto`, primeros 12 chars).
+- [x] Bucketear lat/lng en eventos también (0.05° ~5km).
+- [x] `.gitignore`: service-account.json + variantes.
+- [ ] Re-deploy de reglas: `firebase deploy --only firestore:rules`.
+- [ ] Re-deploy app web: `npm run build:web && firebase deploy --only hosting`.
+
 ## Fase actual
 
-Fase 10 residual + mejoras detectadas. Ver `tasks/pendientes.md`.
+Fase 11 (perfil match) + Fase 12 (privacidad). Ver `tasks/pendientes.md`.

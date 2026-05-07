@@ -1,10 +1,13 @@
 export type AppUser = {
   uid: string;
   name: string;
-  email: string;
+  // email vive solo en Firebase Auth, no en `users/{uid}` (que es lectura pública).
+  // Se rellena en runtime para el dueño desde auth.currentUser; nunca para otros users.
+  email?: string;
   photoUrl: string | null;
   city: string;
   whatsapp?: string;
+  // lat/lng se guardan bucketeados a múltiplos de 0.05° (~5km) por privacidad.
   lat?: number;
   lng?: number;
   premium: boolean;

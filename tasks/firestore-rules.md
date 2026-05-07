@@ -35,6 +35,7 @@ firebase deploy --only firestore:rules
 | `users/{uid}` | Cualquier user logueado | Solo el dueño (uid debe coincidir) |
 | `userAlbums/{uid}` | Cualquier user logueado | Solo el dueño |
 | `events/{id}` | Cualquier user logueado | Crear: cualquier auth con `createdBy=uid`. Editar/borrar: solo el creador |
+| `reports/{id}` | ❌ (solo backend/admin) | Crear: cualquier auth con `reporterUid=uid` y `reason` no vacío (≤500). No update/delete |
 | Resto | ❌ | ❌ |
 
 ## Validaciones extra en `events`
@@ -58,3 +59,21 @@ Permite simular lecturas/escrituras con un uid concreto y ver si pasan o fallan.
 - **Lectura de `userAlbums` abierta a usuarios logueados**: necesaria para que `findMatches` itere sobre los albums de otros usuarios. Se podría restringir más adelante con Cloud Functions que devuelvan matches sin exponer el dataset crudo.
 - **Lectura de `users` abierta a logueados**: necesaria para mostrar nombre/foto/ciudad de matches y creadores de eventos.
 - **Lectura de `events` requiere auth**: si quisieras eventos públicos sin login, cambiar `allow read: if isSignedIn();` por `allow read: if true;`.
+- **`reports` solo permite create**: read/update/delete bloqueados. Pensados para ser revisados desde un dashboard admin (Cloud Function o consola Firestore con cuenta dueña). Cada doc trae `reporterUid`, `targetUid`, `reason`, `createdAt`.
+
+## Re-deploy tras cambios
+
+Cada vez que se modifique `firestore.rules`, volver a ejecutar `firebase deploy --only firestore:rules` (o pegar manualmente en consola).
+
+Cambios pendientes de deploy:
+- Nueva colección `reports` (botón "Reportar usuario" del perfil de match).
+- `users/{uid}`: ya no se permite el campo `email` en create. El email es PII y vive solo en Firebase Auth. Sin redeploy, los logins nuevos van a fallar al crear el doc.
+
+## Privacidad — campos sensibles en `users/{uid}`
+
+- **email**: prohibido en el doc público. Se lee de `auth.currentUser.email` para el dueño en runtime; nunca se expone a otros users.
+- **lat / lng**: se persisten bucketeados a múltiplos de 0.05° (~5 km de precisión) en `saveUserLocation`. El pin del mapa cae sobre un bucket aproximado, no sobre la calle exacta. Suficiente para ranking por distancia sin revelar ubicación.
+- **whatsapp**: opcional, lo carga el usuario explícitamente en su perfil. Quien lo ve en un MatchCard puede contactarlo (tradeoff aceptado).
+- **photoUrl, name, city**: públicos por diseño.
+
+El botón "Mapa" del perfil de match prioriza búsqueda por texto de ciudad, solo cae a coords bucketeadas si no hay city.
