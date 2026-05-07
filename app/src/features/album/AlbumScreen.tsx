@@ -120,6 +120,38 @@ export function AlbumScreen() {
     });
   }, [activeGroupIndex, width]);
 
+  // Auto-saltar al primer país que matchea cuando hay query
+  useEffect(() => {
+    if (normalizedQuery.length < 2) return;
+    if (activeGroup.stickers.some((s) => matchesQuery(s, normalizedQuery))) return;
+    const matchIndex = stickerGroups.findIndex((g) =>
+      g.country.name.toLowerCase().includes(normalizedQuery) ||
+      g.country.code.toLowerCase().includes(normalizedQuery) ||
+      g.country.group?.toLowerCase().includes(normalizedQuery) ||
+      g.stickers.some((s) => matchesQuery(s, normalizedQuery)),
+    );
+    if (matchIndex >= 0 && matchIndex !== activeGroupIndex) {
+      setActiveGroupIndex(matchIndex);
+    }
+  }, [normalizedQuery]);
+
+  // Sugerencias: países que matchean el query (para mostrar lista clickeable)
+  const querySuggestions = useMemo(() => {
+    if (normalizedQuery.length < 2) return [];
+    return stickerGroups
+      .map((group, index) => {
+        const nameMatch = group.country.name.toLowerCase().includes(normalizedQuery);
+        const codeMatch = group.country.code.toLowerCase().includes(normalizedQuery);
+        const groupMatch = group.country.group?.toLowerCase().includes(normalizedQuery);
+        const stickerMatches = group.stickers.filter((s) => matchesQuery(s, normalizedQuery)).length;
+        const score = (nameMatch ? 100 : 0) + (codeMatch ? 50 : 0) + (groupMatch ? 30 : 0) + stickerMatches;
+        return { group, index, score, stickerMatches };
+      })
+      .filter((s) => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+  }, [normalizedQuery]);
+
   // Reset page al cambiar de país
   useEffect(() => {
     setActiveCountryPage(1);
@@ -255,22 +287,48 @@ export function AlbumScreen() {
           </View>
 
           {searchOpen && (
-            <View style={styles.searchCardMobile}>
-              <TextInput
-                accessibilityLabel="Buscar figuritas"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoFocus
-                onChangeText={setQuery}
-                placeholder="Buscar pais, grupo o codigo"
-                placeholderTextColor="#7C857F"
-                style={styles.searchInput}
-                value={query}
-              />
-              {query.length > 0 && (
-                <Pressable onPress={() => setQuery('')} style={styles.clearButton}>
-                  <Text style={styles.clearButtonText}>×</Text>
-                </Pressable>
+            <View>
+              <View style={styles.searchCardMobile}>
+                <TextInput
+                  accessibilityLabel="Buscar figuritas"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus
+                  onChangeText={setQuery}
+                  placeholder="Buscar pais, grupo o codigo"
+                  placeholderTextColor="#7C857F"
+                  style={styles.searchInput}
+                  value={query}
+                />
+                {query.length > 0 && (
+                  <Pressable onPress={() => setQuery('')} style={styles.clearButton}>
+                    <Text style={styles.clearButtonText}>×</Text>
+                  </Pressable>
+                )}
+              </View>
+              {querySuggestions.length > 0 && (
+                <View style={styles.suggestions}>
+                  {querySuggestions.map(({ group, index, stickerMatches }) => (
+                    <Pressable
+                      key={group.country.id}
+                      onPress={() => {
+                        haptic.tap();
+                        setActiveGroupIndex(index);
+                        setQuery('');
+                        setSearchOpen(false);
+                      }}
+                      style={styles.suggestionRow}
+                    >
+                      <Text style={styles.suggestionCode}>{group.country.code}</Text>
+                      <Text style={styles.suggestionName} numberOfLines={1}>
+                        {group.country.name}
+                      </Text>
+                      {stickerMatches > 0 && (
+                        <Text style={styles.suggestionMatches}>{stickerMatches} fig</Text>
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
               )}
             </View>
           )}
@@ -407,20 +465,44 @@ export function AlbumScreen() {
           </View>
 
           <View style={styles.controlsRow}>
-            <View style={styles.searchCard}>
-              <TextInput
-                autoCapitalize="none"
-                autoCorrect={false}
-                onChangeText={setQuery}
-                placeholder="Buscar pais, grupo o codigo"
-                placeholderTextColor="#7C857F"
-                style={styles.searchInput}
-                value={query}
-              />
-              {query.length > 0 && (
-                <Pressable onPress={() => setQuery('')} style={styles.clearButton}>
-                  <Text style={styles.clearButtonText}>Limpiar</Text>
-                </Pressable>
+            <View style={{ position: 'relative', flexBasis: 320 }}>
+              <View style={styles.searchCard}>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={setQuery}
+                  placeholder="Buscar pais, grupo o codigo"
+                  placeholderTextColor="#7C857F"
+                  style={styles.searchInput}
+                  value={query}
+                />
+                {query.length > 0 && (
+                  <Pressable onPress={() => setQuery('')} style={styles.clearButton}>
+                    <Text style={styles.clearButtonText}>Limpiar</Text>
+                  </Pressable>
+                )}
+              </View>
+              {querySuggestions.length > 0 && (
+                <View style={[styles.suggestions, styles.suggestionsDesktop]}>
+                  {querySuggestions.map(({ group, index, stickerMatches }) => (
+                    <Pressable
+                      key={group.country.id}
+                      onPress={() => {
+                        setActiveGroupIndex(index);
+                        setQuery('');
+                      }}
+                      style={styles.suggestionRow}
+                    >
+                      <Text style={styles.suggestionCode}>{group.country.code}</Text>
+                      <Text style={styles.suggestionName} numberOfLines={1}>
+                        {group.country.name}
+                      </Text>
+                      {stickerMatches > 0 && (
+                        <Text style={styles.suggestionMatches}>{stickerMatches} fig</Text>
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
               )}
             </View>
 
@@ -605,6 +687,54 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
     marginHorizontal: spacing.md,
+  },
+  suggestions: {
+    backgroundColor: '#1A1A1A',
+    borderColor: '#333',
+    borderWidth: 1,
+    borderRadius: radii.md,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.xs,
+    overflow: 'hidden',
+  },
+  suggestionsDesktop: {
+    position: 'absolute',
+    top: 52,
+    left: 0,
+    right: 0,
+    marginHorizontal: 0,
+    zIndex: 50,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+    gap: spacing.sm,
+  },
+  suggestionCode: {
+    color: '#FFD600',
+    fontSize: 12,
+    fontWeight: '900',
+    minWidth: 40,
+  },
+  suggestionName: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+  },
+  suggestionMatches: {
+    color: '#B0B0B0',
+    fontSize: 11,
+    fontWeight: '700',
   },
   filterScrollerMobile: {
     flexGrow: 0,
