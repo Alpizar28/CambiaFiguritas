@@ -1,6 +1,7 @@
-import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert, Platform } from 'react-native';
 import type { AppEvent } from '../types';
 import { track } from '../../../services/analytics';
+import { formatDistance } from '../../../utils/distance';
 import { colors, spacing, radii } from '../../../constants/theme';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -31,6 +32,12 @@ export function EventCard({ event, currentUid, onDelete }: Props) {
   };
 
   const handleDelete = () => {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.confirm('¿Seguro que querés eliminar este evento?')) {
+        onDelete?.(event.id);
+      }
+      return;
+    }
     Alert.alert('Eliminar evento', '¿Seguro que querés eliminar este evento?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Eliminar', style: 'destructive', onPress: () => onDelete?.(event.id) },
@@ -64,6 +71,11 @@ export function EventCard({ event, currentUid, onDelete }: Props) {
           {date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
         </Text>
         <Text style={styles.metaText}>👤 {event.creatorName}</Text>
+        {event.distanceKm != null ? (
+          <Text style={styles.metaText}>📍 a {formatDistance(event.distanceKm)}</Text>
+        ) : event.cityName ? (
+          <Text style={styles.metaText}>📍 {event.cityName}</Text>
+        ) : null}
       </View>
 
       <TouchableOpacity style={styles.mapsButton} onPress={openMaps}>
@@ -76,7 +88,9 @@ export function EventCard({ event, currentUid, onDelete }: Props) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: radii.md,
+    borderWidth: 1,
     padding: spacing.md,
     gap: spacing.sm,
   },

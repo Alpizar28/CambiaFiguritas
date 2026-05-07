@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAlbumStore } from '../store/albumStore';
 import { useUserStore } from '../store/userStore';
 import { useSyncStore } from '../store/syncStore';
+import { useWishlistStore } from '../store/wishlistStore';
 import { saveUserAlbum } from '../services/albumSyncService';
 
 const DEBOUNCE_MS = 1500;
@@ -11,6 +12,7 @@ export function useAlbumSync() {
   const uid = useUserStore((s) => s.user?.uid);
   const statuses = useAlbumStore((s) => s.statuses);
   const repeatedCounts = useAlbumStore((s) => s.repeatedCounts);
+  const wishlist = useWishlistStore((s) => s.items);
   const setSyncStatus = useSyncStore((s) => s.setStatus);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -30,7 +32,7 @@ export function useAlbumSync() {
     timer.current = setTimeout(async () => {
       setSyncStatus('saving');
       try {
-        await saveUserAlbum(uid, statuses, repeatedCounts);
+        await saveUserAlbum(uid, statuses, repeatedCounts, wishlist);
         setSyncStatus('saved');
         savedTimer.current = setTimeout(() => setSyncStatus('idle'), SAVED_INDICATOR_MS);
       } catch (e) {
@@ -43,5 +45,5 @@ export function useAlbumSync() {
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [statuses, repeatedCounts, uid, setSyncStatus]);
+  }, [statuses, repeatedCounts, wishlist, uid, setSyncStatus]);
 }

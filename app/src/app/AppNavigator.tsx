@@ -9,7 +9,14 @@ import { AlbumScreen } from '../features/album/AlbumScreen';
 import { EventsScreen } from '../features/events/EventsScreen';
 import { MatchesNavigator } from '../features/matching/MatchesNavigator';
 import { ProfileScreen } from '../features/profile/ProfileScreen';
-import { AlbumIcon, EventsIcon, MatchesIcon, ProfileIcon } from '../components/icons/TabIcons';
+import { RankingsScreen } from '../features/rankings/RankingsScreen';
+import {
+  AlbumIcon,
+  EventsIcon,
+  MatchesIcon,
+  ProfileIcon,
+  RankingsIcon,
+} from '../components/icons/TabIcons';
 import type { RootTabParamList } from '../types/navigation';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -30,6 +37,7 @@ const TAB_ICONS = {
   Album: AlbumIcon,
   Matches: MatchesIcon,
   Events: EventsIcon,
+  Rankings: RankingsIcon,
   Profile: ProfileIcon,
 } as const;
 
@@ -66,6 +74,8 @@ export function AppNavigator() {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
             paddingTop: 6,
+            paddingBottom: 8,
+            height: 62,
           },
           tabBarIcon: ({ focused }) => {
             const Icon = TAB_ICONS[route.name];
@@ -87,6 +97,11 @@ export function AppNavigator() {
           name="Events"
           component={EventsScreen}
           options={{ title: 'Eventos' }}
+        />
+        <Tab.Screen
+          name="Rankings"
+          component={RankingsScreen}
+          options={{ title: 'Ranking' }}
         />
         <Tab.Screen
           name="Profile"

@@ -3,6 +3,8 @@ import { BottomSheet } from '../../../components/BottomSheet';
 import { colors, radii, spacing } from '../../../constants/theme';
 import type { Sticker, StickerStatus } from '../types';
 import { haptic } from '../../../utils/haptics';
+import { useWishlistStore } from '../../../store/wishlistStore';
+import { useTutorialStore } from '../../../store/tutorialStore';
 
 type Props = {
   visible: boolean;
@@ -25,6 +27,10 @@ export function StickerActionSheet({
   onDecrement,
   onClose,
 }: Props) {
+  const isWishlisted = useWishlistStore((s) => (sticker ? s.isWishlisted(sticker.id) : false));
+  const toggleWishlist = useWishlistStore((s) => s.toggle);
+  const tutorialDone = useTutorialStore((s) => Boolean(s.completed['sticker-wishlist']));
+
   if (!sticker) {
     return <BottomSheet visible={visible} onClose={onClose}><View /></BottomSheet>;
   }
@@ -33,6 +39,12 @@ export function StickerActionSheet({
     haptic.tap();
     onSelectStatus(s);
     onClose();
+  };
+
+  const handleWishlistToggle = () => {
+    haptic.tap();
+    toggleWishlist(sticker.id);
+    useTutorialStore.getState().complete('sticker-wishlist');
   };
 
   return (
@@ -83,6 +95,22 @@ export function StickerActionSheet({
           </View>
         </View>
       )}
+
+      <Pressable
+        style={[styles.wishlistRow, isWishlisted && styles.wishlistRowActive]}
+        onPress={handleWishlistToggle}
+      >
+        <Text style={styles.wishlistIcon}>{isWishlisted ? '⭐' : '☆'}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.wishlistTitle}>
+            {isWishlisted ? 'Es prioridad' : 'Marcar como prioridad'}
+            {!tutorialDone ? <Text style={styles.wishlistNew}>  · Nuevo</Text> : null}
+          </Text>
+          <Text style={styles.wishlistSubtitle}>
+            Las prioridades pesan más al buscar matches.
+          </Text>
+        </View>
+      </Pressable>
     </BottomSheet>
   );
 }
@@ -189,5 +217,39 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     minWidth: 60,
     textAlign: 'center',
+  },
+  wishlistRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: spacing.lg,
+    padding: spacing.md,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  wishlistRowActive: {
+    borderColor: '#FFD700',
+    backgroundColor: 'rgba(255,215,0,0.08)',
+  },
+  wishlistIcon: {
+    fontSize: 28,
+    color: '#FFD700',
+  },
+  wishlistTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  wishlistNew: {
+    color: '#FFD700',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  wishlistSubtitle: {
+    color: colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
   },
 });

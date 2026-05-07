@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1058576446766",
+    "project_id": "cambiafiguritas",
+    "storage_bucket": "cambiafiguritas.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1058576446766:android:231f58412b96adb35576bf",
+        "android_client_info": {
+          "package_name": "com.cambiafiguritas.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1058576446766-r6ktjd5ptkg0h44trgc0a2lbab3001r8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDycFGwkQyxUEJx7mQQSS63vR4hHr_Wv7U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1058576446766-r6ktjd5ptkg0h44trgc0a2lbab3001r8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

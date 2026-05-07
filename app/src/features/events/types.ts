@@ -10,4 +10,7 @@ export type AppEvent = {
   date: string;
   createdBy: string;
   creatorName: string;
+  cityName?: string;
+  citySlug?: string;
+  distanceKm?: number;
 };

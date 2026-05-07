@@ -141,6 +141,49 @@ export function EventsIcon({ size = 28, active = false }: IconProps) {
 }
 
 /**
+ * Rankings → trofeo con halo dorado
+ */
+export function RankingsIcon({ size = 28, active = false }: IconProps) {
+  const main = active ? PALETTE.yellow : PALETTE.mute;
+  const fill = active ? PALETTE.yellow : '#3A3A3A';
+  return (
+    <Svg width={size} height={size} viewBox="0 0 28 28">
+      {/* Asa izquierda */}
+      <Path
+        d="M7 8 C5 8 4 9 4 11 C4 13 5 14 7 14"
+        stroke={main}
+        strokeWidth={1.6}
+        fill="none"
+      />
+      {/* Asa derecha */}
+      <Path
+        d="M21 8 C23 8 24 9 24 11 C24 13 23 14 21 14"
+        stroke={main}
+        strokeWidth={1.6}
+        fill="none"
+      />
+      {/* Copa */}
+      <Path
+        d="M7 5 H21 V13 C21 17 18 19.5 14 19.5 C10 19.5 7 17 7 13 Z"
+        fill={fill}
+        stroke={main}
+        strokeWidth={1.6}
+      />
+      {/* Pie */}
+      <Rect x={11} y={19} width={6} height={2.5} fill={main} />
+      <Rect x={9} y={21.5} width={10} height={2} rx={1} fill={main} />
+      {/* Estrella central si activo */}
+      {active ? (
+        <Path
+          d="M14 8 L15 11 L18 11 L15.5 13 L16.5 16 L14 14 L11.5 16 L12.5 13 L10 11 L13 11 Z"
+          fill="#0A0A0A"
+        />
+      ) : null}
+    </Svg>
+  );
+}
+
+/**
  * Profile → silueta con halo deportivo
  */
 export function ProfileIcon({ size = 28, active = false }: IconProps) {

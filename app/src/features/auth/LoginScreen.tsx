@@ -13,6 +13,8 @@ import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
 import { GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
 import { auth } from '../../services/firebase';
+import { useUserStore } from '../../store/userStore';
+import { track } from '../../services/analytics';
 import { colors, spacing, radii } from '../../constants/theme';
 import { LegalModal } from '../profile/LegalModal';
 import { PRIVACY_TEXT, TERMS_TEXT } from '../profile/legalContent';
@@ -29,6 +31,27 @@ export function LoginScreen() {
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [legalView, setLegalView] = useState<LegalView>(null);
+  const setUser = useUserStore((s) => s.setUser);
+  const setLoading = useUserStore((s) => s.setLoading);
+  const enterDemo = useUserStore((s) => s.enterDemo);
+
+  const handleDemoEntry = () => {
+    track({ name: 'demo_entered' });
+    enterDemo();
+  };
+
+  const handleDevLogin = () => {
+    setLoading(false);
+    setUser({
+      uid: 'dev-user-001',
+      name: 'Dev User',
+      email: 'dev@cambiafiguritas.local',
+      photoUrl: null,
+      city: 'San José',
+      premium: false,
+      createdAt: new Date().toISOString(),
+    });
+  };
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: WEB_CLIENT_ID,
@@ -68,7 +91,15 @@ export function LoginScreen() {
         // onAuthStateChanged en App.tsx maneja el resto
       } catch (e: any) {
         if (e?.code !== 'auth/popup-closed-by-user') {
-          setError('Error al iniciar sesión. Intentá de nuevo.');
+          const isSafariStorage =
+            e?.message?.includes('missing initial state') ||
+            e?.message?.includes('sessionStorage') ||
+            e?.code === 'auth/web-storage-unsupported';
+          setError(
+            isSafariStorage
+              ? 'Safari bloqueó el login. Desactivá "Prevenir rastreo" en Ajustes > Safari, o usá modo normal (no privado).'
+              : 'Error al iniciar sesión. Intentá de nuevo.',
+          );
         }
         setSigningIn(false);
       }
@@ -113,6 +144,14 @@ export function LoginScreen() {
           </Pressable>
           .
         </Text>
+        <TouchableOpacity style={styles.demoButton} onPress={handleDemoEntry}>
+          <Text style={styles.demoButtonText}>Ver el álbum sin cuenta →</Text>
+        </TouchableOpacity>
+        {__DEV__ && (
+          <TouchableOpacity style={styles.devButton} onPress={handleDevLogin}>
+            <Text style={styles.devButtonText}>⚙ Entrar sin login (DEV)</Text>
+          </TouchableOpacity>
+        )}
       </View>
       <LegalModal
         visible={legalView === 'privacy'}
@@ -194,5 +233,26 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     textDecorationLine: 'underline',
+  },
+  demoButton: {
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  demoButtonText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  devButton: {
+    borderColor: '#444',
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  devButtonText: {
+    color: '#666',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

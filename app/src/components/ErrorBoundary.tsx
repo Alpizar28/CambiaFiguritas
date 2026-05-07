@@ -2,6 +2,7 @@ import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { colors, spacing, radii } from '../constants/theme';
+import { captureError } from '../services/sentry';
 
 type Props = { children: ReactNode };
 type State = { hasError: boolean; error: Error | null };
@@ -17,7 +18,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (__DEV__) {
       console.error('[ErrorBoundary]', error, info);
     }
-    // En prod podríamos mandar a un servicio de crash reporting (Sentry, Crashlytics).
+    captureError(error, { componentStack: info.componentStack });
   }
 
   reset = () => {

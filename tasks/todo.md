@@ -193,4 +193,99 @@ Fase 3: Firebase Auth — pendiente de config real del proyecto Firebase.
 
 ## Fase actual
 
-Fase 11 (perfil match) + Fase 12 (privacidad). Ver `tasks/pendientes.md`.
+Fase 11 (perfil match) + Fase 12 (privacidad) + Roadmap MVP post-deploy 2026-05-06. Ver `tasks/pendientes.md`.
+
+---
+
+# Roadmap MVP (post-deploy web 2026-05-06)
+
+Reordenado por impacto + dependencias. Foco: web + Android (sin iOS nativo).
+
+| # | Tarea | Estado | Estimación | Bloquea | Bloqueado por |
+|---|-------|--------|------------|---------|---------------|
+| T8 | Splash screen oscuro | ✅ Hecho | — | — | — |
+| T1 | Auditoría Firestore rules + 23 tests | ✅ 23/23 pass | 5-6h | T5, T7 | — |
+| T6 | Rename mockAlbum → albumCatalog | ✅ Hecho | 1.5-2h | — | — |
+| T4 | Onboarding 4 slides | ✅ Hecho | 5-7h | — | — |
+| T5a | Compartir progreso simple | ✅ Hecho | 1h | — | — |
+| TUX | Filtros UX en Matches | ✅ Hecho | 1h | — | — |
+| TPWA | PWA installable + manifest + SW | ✅ Hecho | 2h | — | — |
+| TStats | Stats breakdown por país en Profile | ✅ Hecho | 1h | — | — |
+| TBadge | Badge país completo en album lista | ✅ Hecho | 0.5h | — | — |
+| T2 | Ícono de la app | ⏳ | 2-4h | T3 | — |
+| T3 | EAS preview Android | ⏳ | 4-8h | Release | T2 |
+| T5 | Compartir álbum link público | ⏳ | 12-16h | — | T1 |
+| T7 | Push notifications | ⏳ | 14-20h | — | T1, T3 |
+
+## T1 — Auditoría Firestore rules
+
+Rules ya deployadas. Falta endurecer + tests.
+
+- [ ] Validar que `users update` no permita mutar `uid`, `email`, `createdAt`.
+- [ ] Validar tamaño de `description` y `creatorName` en events.
+- [ ] Tests con `@firebase/rules-unit-testing` (NUEVO `firestore.rules.test.js`).
+- [ ] Cubrir: anon read denied, no-owner write denied, mutación campos restringidos.
+- [ ] Deploy `firebase deploy --only firestore:rules`.
+
+## T2 — Ícono app
+
+- [ ] Diseñar 1024x1024 (figurita estilizada + amarillo `#FFD600` + bg `#0A0A0A`).
+- [ ] Reemplazar `app/assets/icon.png`, `adaptive-icon.png`, `favicon.png`, `splash-icon.png`.
+- [ ] Cambiar `app.json` `android.adaptiveIcon.backgroundColor` a `#0A0A0A`.
+
+## T3 — EAS preview Android
+
+- [ ] Pre-flight: `npm run typecheck`, validar `app.json` package/bundle.
+- [ ] Maps SDK Android API key en `app.json` `android.config.googleMaps.apiKey`.
+- [ ] `eas build --platform android --profile preview`.
+- [ ] Smoke E2E device real: login → sticker → match → evento → mapa.
+
+## T6 — Auditoría Matches
+
+`MatchesScreen` YA conectado a Firestore real. No es mock.
+
+- [ ] Renombrar `app/src/features/album/data/mockAlbum.ts` → `albumCatalog.ts` (es catálogo oficial 981, no mock).
+- [ ] Actualizar imports en `albumStore.ts`, `matchingService.ts`, `AlbumScreen.tsx`.
+- [ ] E2E con 2 cuentas: marcar complementario, verificar match score > 0.
+- [ ] TODO comment en `matchingService.ts` sobre paginación geo (YAGNI hasta >100 users).
+
+## T4 — Onboarding
+
+- [ ] NUEVO `app/src/store/onboardingStore.ts` (zustand persist `hasCompletedOnboarding`).
+- [ ] NUEVO `app/src/features/onboarding/OnboardingScreen.tsx` (4 slides FlatList).
+- [ ] Gate en `App.tsx` post-login antes de `AppWithSync`.
+- [ ] Eventos analytics: `onboarding_started/skipped/completed`.
+- [ ] Botón "Ver tutorial" en ProfileScreen.
+
+## T5 — Compartir álbum (link público)
+
+Requiere Cloud Function (upgrade a Blaze plan).
+
+- [ ] Decidir: pasar a Blaze plan (cobra). Confirmar con usuario.
+- [ ] NUEVO `functions/` dir con Cloud Functions.
+- [ ] Trigger `users.onWrite` → sync a `publicProfiles/{uid}` (whitelist `name, photoUrl, city`).
+- [ ] HTTPS function `getPublicAlbum?uid=xxx` que devuelve JSON limpio.
+- [ ] NUEVO `app/src/features/share/PublicAlbumScreen.tsx` (read-only, sin login).
+- [ ] Linking config en `NavigationContainer` para `/u/:uid`.
+- [ ] Botón "Compartir álbum" en ProfileScreen + `expo-clipboard` + `Share.share`.
+- [ ] Rules: `publicProfiles` read sin auth, write solo via Cloud Function.
+
+## T7 — Push notifications
+
+- [ ] `npx expo install expo-notifications expo-device`.
+- [ ] Plugin en `app.json` + icon notif 96x96 transparente.
+- [ ] NUEVO `app/src/services/pushService.ts` — registrar token, guardar en `users/{uid}.expoPushToken`.
+- [ ] Cloud Function `notifyMatches` trigger en `userAlbums.onWrite`:
+  - Recalcular matches del user.
+  - Push a otros con score > N via Expo Push API.
+  - Throttle 1 notif/user/24h (campo `lastNotifiedAt`).
+- [ ] Deep link tap → MatchesScreen + scroll al match.
+- [ ] Toggle "Notificaciones" en ProfileScreen (campo `pushEnabled`).
+- [ ] Eventos analytics: `push_token_registered/received/tapped`.
+
+## Riesgos cross-cutting
+
+- Cloud Functions requieren Blaze plan (T5, T7). Validar OK pasar a pay-as-you-go antes.
+- EAS build puede fallar por configs Maps/AdMob. Build dev primero local.
+- Push spam → hard cap 1/24h.
+- Compartir álbum expone PII si rules mal. Tests obligatorios pre-deploy.

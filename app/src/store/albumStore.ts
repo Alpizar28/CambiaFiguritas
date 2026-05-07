@@ -2,10 +2,16 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { allStickers } from '../features/album/data/mockAlbum';
+import { allStickers } from '../features/album/data/albumCatalog';
 import { track } from '../services/analytics';
 import { haptic } from '../utils/haptics';
+import { isDemoMode } from './userStore';
 import type { StickerStatus, StickerStatusMap } from '../features/album/types';
+
+let onDemoWriteAttempt: (() => void) | null = null;
+export function setDemoWriteHandler(handler: (() => void) | null) {
+  onDemoWriteAttempt = handler;
+}
 
 const stickerById = new Map(allStickers.map((s) => [s.id, s]));
 
@@ -61,6 +67,10 @@ export const useAlbumStore = create<AlbumState>()(
   statuses: initialStatuses,
   repeatedCounts: initialRepeatedCounts,
   setStatus: (stickerId, status) => {
+    if (isDemoMode()) {
+      onDemoWriteAttempt?.();
+      return;
+    }
     set((state) => ({
       statuses: {
         ...state.statuses,
@@ -95,6 +105,10 @@ export const useAlbumStore = create<AlbumState>()(
     }
   },
   incrementRepeated: (stickerId) => {
+    if (isDemoMode()) {
+      onDemoWriteAttempt?.();
+      return;
+    }
     const currentStatus = get().statuses[stickerId];
     if (currentStatus === 'missing') {
       return;
@@ -119,6 +133,10 @@ export const useAlbumStore = create<AlbumState>()(
     });
   },
   decrementRepeated: (stickerId) => {
+    if (isDemoMode()) {
+      onDemoWriteAttempt?.();
+      return;
+    }
     const currentStatus = get().statuses[stickerId];
     const currentCount = get().repeatedCounts[stickerId] ?? 0;
     if (currentStatus === 'missing' || currentCount <= 0) {

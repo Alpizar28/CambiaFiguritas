@@ -6,12 +6,12 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0A0A0A"
     },
     "ios": {
       "supportsTablet": true,
@@ -21,6 +21,7 @@
       }
     },
     "android": {
+      "googleServicesFile": "./google-services.json",
       "package": "com.cambiafiguritas.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -35,7 +36,8 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "backgroundColor": "#0A0A0A"
     },
     "plugins": [
       "expo-web-browser",

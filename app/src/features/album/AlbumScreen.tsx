@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
-  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,9 +19,12 @@ import { ContextMenu } from './components/ContextMenu';
 import { RepeatCounterMenu } from './components/RepeatCounterMenu';
 import { ConnectedStickerCard } from './components/ConnectedStickerCard';
 import { StickerActionSheet } from './components/StickerActionSheet';
-import { countryStickerGroups, specialStickerGroup } from './data/mockAlbum';
+import { allStickers, countryStickerGroups, specialStickerGroup } from './data/albumCatalog';
 import { haptic } from '../../utils/haptics';
+import { track } from '../../services/analytics';
+import { Tooltip } from '../../components/Tooltip';
 import type { AlbumSlot, CountryAlbumPage, Sticker, StickerStatus } from './types';
+import { fuzzyContains } from './utils/fuzzyMatch';
 
 type AlbumFilter = 'all' | StickerStatus;
 
@@ -36,14 +38,52 @@ const filters: Array<{ label: string; value: AlbumFilter }> = [
 
 const stickerGroups = countryStickerGroups.concat(specialStickerGroup);
 
-const matchesQuery = (sticker: Sticker, normalizedQuery: string) =>
-  normalizedQuery.length === 0 ||
-  sticker.countryName?.toLowerCase().includes(normalizedQuery) ||
-  sticker.group?.toLowerCase().includes(normalizedQuery) ||
-  sticker.displayCode.toLowerCase().includes(normalizedQuery) ||
-  sticker.label.toLowerCase().includes(normalizedQuery) ||
-  sticker.kind.toLowerCase().includes(normalizedQuery) ||
-  String(sticker.slotNumber).includes(normalizedQuery);
+const stickersByCode: Map<string, { sticker: Sticker; groupIndex: number }> = new Map();
+stickerGroups.forEach((group, groupIndex) => {
+  group.stickers.forEach((sticker) => {
+    stickersByCode.set(sticker.displayCode.toLowerCase(), { sticker, groupIndex });
+  });
+});
+
+// Detecta búsqueda por código directo: "ARG12", "FW1", "12 argentina", "argentina 12"
+function parseDirectCode(rawQuery: string): { sticker: Sticker; groupIndex: number } | null {
+  const q = rawQuery.trim().toLowerCase();
+  if (q.length < 2) return null;
+  const direct = stickersByCode.get(q);
+  if (direct) return direct;
+  // "12 argentina" o "argentina 12": split en palabras + número
+  const numMatch = q.match(/^(.+?)\s+(\d{1,3})$|^(\d{1,3})\s+(.+)$/);
+  if (!numMatch) return null;
+  const word = (numMatch[1] || numMatch[4] || '').trim();
+  const num = numMatch[2] || numMatch[3];
+  if (!word || !num) return null;
+  const groupIdx = stickerGroups.findIndex(
+    (g) =>
+      g.country.name.toLowerCase().includes(word) ||
+      g.country.code.toLowerCase() === word.toLowerCase(),
+  );
+  if (groupIdx < 0) return null;
+  const group = stickerGroups[groupIdx];
+  const numInt = parseInt(num, 10);
+  const sticker = group.stickers.find((s) => s.slotNumber === numInt);
+  if (!sticker) return null;
+  return { sticker, groupIndex: groupIdx };
+}
+
+const matchesQuery = (sticker: Sticker, normalizedQuery: string) => {
+  if (normalizedQuery.length === 0) return true;
+  const fields = [
+    sticker.countryName ?? '',
+    sticker.group ?? '',
+    sticker.displayCode,
+    sticker.label,
+    sticker.kind,
+  ];
+  for (const f of fields) {
+    if (fuzzyContains(f.toLowerCase(), normalizedQuery)) return true;
+  }
+  return String(sticker.slotNumber).includes(normalizedQuery);
+};
 
 const getGroupStats = (stickers: Sticker[], statuses: Record<string, StickerStatus>) => {
   const owned = stickers.filter((sticker) => {
@@ -66,6 +106,7 @@ export function AlbumScreen() {
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<AlbumFilter>('all');
+  const [highlightedStickerId, setHighlightedStickerId] = useState<string | null>(null);
 
   // Para desktop (menú flotante)
   const [menuState, setMenuState] = useState<{
@@ -79,7 +120,7 @@ export function AlbumScreen() {
   const [sheetStickerId, setSheetStickerId] = useState<string | null>(null);
 
   const countryScrollerRef = useRef<ScrollView>(null);
-  const pagerRef = useRef<FlatList<CountryAlbumPage>>(null);
+  const pagerRef = useRef<ScrollView>(null);
 
   const statuses = useAlbumStore((state) => state.statuses);
   const repeatedCounts = useAlbumStore((state) => state.repeatedCounts);
@@ -93,6 +134,15 @@ export function AlbumScreen() {
   const activeStats = getGroupStats(activeGroup.stickers, statuses);
   const normalizedQuery = query.trim().toLowerCase();
   const isSpecials = activeGroup.country.id === 'especiales';
+
+  // Si query matchea metadata del país activo (nombre/código/grupo),
+  // mostrar todas las figuritas del país en vez de filtrar individualmente.
+  const queryMatchesCountryMeta =
+    normalizedQuery.length >= 2 &&
+    (activeGroup.country.name.toLowerCase().includes(normalizedQuery) ||
+      activeGroup.country.code.toLowerCase().includes(normalizedQuery) ||
+      !!activeGroup.country.group?.toLowerCase().includes(normalizedQuery));
+  const effectiveQuery = queryMatchesCountryMeta ? '' : normalizedQuery;
 
   const stickersById = useMemo(
     () =>
@@ -108,9 +158,9 @@ export function AlbumScreen() {
       activeGroup.stickers.filter((sticker) => {
         const status = statuses[sticker.id] ?? 'missing';
         const matchesFilter = activeFilter === 'all' || status === activeFilter;
-        return matchesFilter && matchesQuery(sticker, normalizedQuery);
+        return matchesFilter && matchesQuery(sticker, effectiveQuery);
       }),
-    [activeGroup, statuses, activeFilter, normalizedQuery],
+    [activeGroup, statuses, activeFilter, effectiveQuery],
   );
 
   // Auto-scroll al país activo
@@ -121,10 +171,64 @@ export function AlbumScreen() {
     });
   }, [activeGroupIndex, width]);
 
+  // Búsqueda directa por código: "ARG12", "FW1", "12 argentina"
+  // Si hay match exacto: salta al país + highlight 2.5s
+  useEffect(() => {
+    const direct = parseDirectCode(normalizedQuery);
+    if (!direct) {
+      setHighlightedStickerId(null);
+      return;
+    }
+    if (direct.groupIndex !== activeGroupIndex) {
+      setActiveGroupIndex(direct.groupIndex);
+    }
+    setActiveFilter('all');
+    setHighlightedStickerId(direct.sticker.id);
+    track({
+      name: 'sticker_searched_by_code',
+      params: { code: direct.sticker.displayCode, matched: true },
+    });
+    const timer = setTimeout(() => setHighlightedStickerId(null), 2500);
+    return () => clearTimeout(timer);
+  }, [normalizedQuery]);
+
+  // Auto-saltar al primer país que matchea cuando hay query (fallback no-código)
+  useEffect(() => {
+    if (normalizedQuery.length < 2) return;
+    if (parseDirectCode(normalizedQuery)) return; // direct code maneja jump
+    if (activeGroup.stickers.some((s) => matchesQuery(s, normalizedQuery))) return;
+    const matchIndex = stickerGroups.findIndex((g) =>
+      g.country.name.toLowerCase().includes(normalizedQuery) ||
+      g.country.code.toLowerCase().includes(normalizedQuery) ||
+      g.country.group?.toLowerCase().includes(normalizedQuery) ||
+      g.stickers.some((s) => matchesQuery(s, normalizedQuery)),
+    );
+    if (matchIndex >= 0 && matchIndex !== activeGroupIndex) {
+      setActiveGroupIndex(matchIndex);
+    }
+  }, [normalizedQuery]);
+
+  // Sugerencias: países que matchean el query (para mostrar lista clickeable)
+  const querySuggestions = useMemo(() => {
+    if (normalizedQuery.length < 2) return [];
+    return stickerGroups
+      .map((group, index) => {
+        const nameMatch = group.country.name.toLowerCase().includes(normalizedQuery);
+        const codeMatch = group.country.code.toLowerCase().includes(normalizedQuery);
+        const groupMatch = group.country.group?.toLowerCase().includes(normalizedQuery);
+        const stickerMatches = group.stickers.filter((s) => matchesQuery(s, normalizedQuery)).length;
+        const score = (nameMatch ? 100 : 0) + (codeMatch ? 50 : 0) + (groupMatch ? 30 : 0) + stickerMatches;
+        return { group, index, score, stickerMatches };
+      })
+      .filter((s) => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+  }, [normalizedQuery]);
+
   // Reset page al cambiar de país
   useEffect(() => {
     setActiveCountryPage(1);
-    pagerRef.current?.scrollToOffset({ offset: 0, animated: false });
+    pagerRef.current?.scrollTo({ x: 0, animated: false });
   }, [activeGroupIndex]);
 
   const moveCountry = (direction: -1 | 1) => {
@@ -166,7 +270,7 @@ export function AlbumScreen() {
   const shouldShowSticker = (sticker: Sticker) => {
     const status = statuses[sticker.id] ?? 'missing';
     const matchesFilter = activeFilter === 'all' || status === activeFilter;
-    return matchesFilter && matchesQuery(sticker, normalizedQuery);
+    return matchesFilter && matchesQuery(sticker, effectiveQuery);
   };
 
   const renderSlot = (slot: AlbumSlot, index: number) => {
@@ -197,6 +301,7 @@ export function AlbumScreen() {
         key={sticker.id}
         sticker={sticker}
         colSpan={slot.colSpan}
+        highlighted={highlightedStickerId === sticker.id}
         onLongPress={handleLongPress}
       />
     );
@@ -205,7 +310,7 @@ export function AlbumScreen() {
   const renderAlbumPage = (page: CountryAlbumPage, pageWidth?: number) => (
     <View
       key={page.pageInCountry}
-      style={[styles.albumPage, pageWidth != null && { width: pageWidth }]}
+      style={[styles.albumPage, pageWidth != null ? { width: pageWidth } : { alignSelf: 'stretch' }]}
     >
       <View style={styles.pageTopline}>
         <Text style={styles.pageLabel}>Pagina {page.pageInCountry}</Text>
@@ -219,9 +324,15 @@ export function AlbumScreen() {
 
   // ----- MOBILE LAYOUT -----
   if (!isDesktop) {
-    const pageWidth = width - spacing.md * 2 - 6; // padding interno del spread
+    const pageWidth = undefined; // móvil: ancho natural 100%
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <Tooltip
+          id="album-search"
+          title="🔎 Buscá rápido"
+          message="Escribí 'ARG12' o 'argentina 12' para saltar directo a esa figurita."
+          position="top"
+        />
         {/* Header compacto sticky */}
         <View style={styles.mobileHeader}>
           <View style={styles.mobileTitleRow}>
@@ -250,25 +361,54 @@ export function AlbumScreen() {
             </Text>
           </View>
 
-          <AlbumProgress {...stats} />
+          {/* Barra de progreso compacta inline */}
+          <View style={styles.mobileProgressBar}>
+            <View style={[styles.mobileProgressFill, { width: `${Math.min(100, Math.max(0, stats.progress))}%` as any }]} />
+          </View>
 
           {searchOpen && (
-            <View style={styles.searchCardMobile}>
-              <TextInput
-                accessibilityLabel="Buscar figuritas"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoFocus
-                onChangeText={setQuery}
-                placeholder="Buscar pais, grupo o codigo"
-                placeholderTextColor="#7C857F"
-                style={styles.searchInput}
-                value={query}
-              />
-              {query.length > 0 && (
-                <Pressable onPress={() => setQuery('')} style={styles.clearButton}>
-                  <Text style={styles.clearButtonText}>×</Text>
-                </Pressable>
+            <View>
+              <View style={styles.searchCardMobile}>
+                <TextInput
+                  accessibilityLabel="Buscar figuritas"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoFocus
+                  onChangeText={setQuery}
+                  placeholder="Buscar pais, grupo o codigo"
+                  placeholderTextColor="#7C857F"
+                  style={styles.searchInput}
+                  value={query}
+                />
+                {query.length > 0 && (
+                  <Pressable onPress={() => setQuery('')} style={styles.clearButton}>
+                    <Text style={styles.clearButtonText}>×</Text>
+                  </Pressable>
+                )}
+              </View>
+              {querySuggestions.length > 0 && (
+                <View style={styles.suggestions}>
+                  {querySuggestions.map(({ group, index, stickerMatches }) => (
+                    <Pressable
+                      key={group.country.id}
+                      onPress={() => {
+                        haptic.tap();
+                        setActiveGroupIndex(index);
+                        setQuery('');
+                        setSearchOpen(false);
+                      }}
+                      style={styles.suggestionRow}
+                    >
+                      <Text style={styles.suggestionCode}>{group.country.code}</Text>
+                      <Text style={styles.suggestionName} numberOfLines={1}>
+                        {group.country.name}
+                      </Text>
+                      {stickerMatches > 0 && (
+                        <Text style={styles.suggestionMatches}>{stickerMatches} fig</Text>
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
               )}
             </View>
           )}
@@ -312,12 +452,18 @@ export function AlbumScreen() {
               {stickerGroups.map((group, index) => {
                 const isActive = index === activeGroupIndex;
                 const groupStats = getGroupStats(group.stickers, statuses);
+                const isComplete = groupStats.total > 0 && groupStats.owned === groupStats.total;
                 return (
                   <Pressable
                     key={group.country.id}
                     onPress={() => { haptic.tap(); setActiveGroupIndex(index); }}
-                    style={[styles.countryButton, isActive && styles.countryButtonActive]}
+                    style={[
+                      styles.countryButton,
+                      isActive && styles.countryButtonActive,
+                      isComplete && !isActive && styles.countryButtonComplete,
+                    ]}
                   >
+                    {isComplete && <Text style={styles.completeBadge}>✓</Text>}
                     <Text style={[styles.countryButtonText, isActive && styles.countryButtonTextActive]}>
                       {group.country.code}
                     </Text>
@@ -339,53 +485,29 @@ export function AlbumScreen() {
           </View>
         </View>
 
-        {/* Páginas con swipe horizontal */}
-        <View style={[styles.spread, { paddingBottom: insets.bottom + 90 }]}>
+        {/* Páginas — scroll vertical, una debajo de la otra */}
+        <ScrollView
+          style={styles.mobileScroll}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 120, gap: spacing.sm }}
+          showsVerticalScrollIndicator={false}
+        >
           {isSpecials ? (
-            <ScrollView contentContainerStyle={styles.specialPanel}>
+            <View style={styles.mobilePage}>
               <View style={styles.originalGrid}>
                 {visibleStickers.map((sticker) => (
                   <ConnectedStickerCard
                     key={sticker.id}
                     sticker={sticker}
+                    highlighted={highlightedStickerId === sticker.id}
                     onLongPress={handleLongPress}
                   />
                 ))}
               </View>
-            </ScrollView>
+            </View>
           ) : (
-            <>
-              <FlatList
-                ref={pagerRef}
-                data={activeGroup.pages}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                keyExtractor={(p) => String(p.pageInCountry)}
-                renderItem={({ item }) => (
-                  <ScrollView contentContainerStyle={{ paddingBottom: spacing.lg }}>
-                    {renderAlbumPage(item, pageWidth)}
-                  </ScrollView>
-                )}
-                onMomentumScrollEnd={(e) => {
-                  const page = Math.round(e.nativeEvent.contentOffset.x / pageWidth) + 1;
-                  setActiveCountryPage(page as 1 | 2);
-                }}
-                getItemLayout={(_, index) => ({ length: pageWidth, offset: pageWidth * index, index })}
-                snapToInterval={pageWidth}
-                decelerationRate="fast"
-              />
-              <View style={styles.pageDots}>
-                {[1, 2].map((p) => (
-                  <View
-                    key={p}
-                    style={[styles.pageDot, activeCountryPage === p && styles.pageDotActive]}
-                  />
-                ))}
-              </View>
-            </>
+            activeGroup.pages.map((item) => renderAlbumPage(item, pageWidth))
           )}
-        </View>
+        </ScrollView>
 
         <StickerActionSheet
           visible={!!sheetSticker}
@@ -401,10 +523,18 @@ export function AlbumScreen() {
     );
   }
 
-  // ----- DESKTOP LAYOUT (existente) -----
+  // ----- DESKTOP LAYOUT -----
   const pagesToRender = activeGroup.pages;
+  const desktopContentWidth = Math.min(width, 1220) - spacing.lg * 2;
+  const desktopPageWidth = (desktopContentWidth - spacing.sm * 3) / 2;
   return (
     <View style={styles.screen}>
+      <Tooltip
+        id="album-search"
+        title="🔎 Buscá rápido"
+        message="Escribí 'ARG12' o 'argentina 12' para saltar directo a esa figurita."
+        position="top"
+      />
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.workspace}>
           <View style={styles.toolbar}>
@@ -421,21 +551,45 @@ export function AlbumScreen() {
             </View>
           </View>
 
-          <View style={styles.controlsRow}>
-            <View style={styles.searchCard}>
-              <TextInput
-                autoCapitalize="none"
-                autoCorrect={false}
-                onChangeText={setQuery}
-                placeholder="Buscar pais, grupo o codigo"
-                placeholderTextColor="#7C857F"
-                style={styles.searchInput}
-                value={query}
-              />
-              {query.length > 0 && (
-                <Pressable onPress={() => setQuery('')} style={styles.clearButton}>
-                  <Text style={styles.clearButtonText}>Limpiar</Text>
-                </Pressable>
+          <View style={[styles.controlsRow, { zIndex: 100 }]}>
+            <View style={{ position: 'relative', flexBasis: 320, zIndex: 100 }}>
+              <View style={styles.searchCard}>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onChangeText={setQuery}
+                  placeholder="Buscar pais, grupo o codigo"
+                  placeholderTextColor="#7C857F"
+                  style={styles.searchInput}
+                  value={query}
+                />
+                {query.length > 0 && (
+                  <Pressable onPress={() => setQuery('')} style={styles.clearButton}>
+                    <Text style={styles.clearButtonText}>Limpiar</Text>
+                  </Pressable>
+                )}
+              </View>
+              {querySuggestions.length > 0 && (
+                <View style={[styles.suggestions, styles.suggestionsDesktop]}>
+                  {querySuggestions.map(({ group, index, stickerMatches }) => (
+                    <Pressable
+                      key={group.country.id}
+                      onPress={() => {
+                        setActiveGroupIndex(index);
+                        setQuery('');
+                      }}
+                      style={styles.suggestionRow}
+                    >
+                      <Text style={styles.suggestionCode}>{group.country.code}</Text>
+                      <Text style={styles.suggestionName} numberOfLines={1}>
+                        {group.country.name}
+                      </Text>
+                      {stickerMatches > 0 && (
+                        <Text style={styles.suggestionMatches}>{stickerMatches} fig</Text>
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
               )}
             </View>
 
@@ -504,14 +658,15 @@ export function AlbumScreen() {
                   <ConnectedStickerCard
                     key={sticker.id}
                     sticker={sticker}
+                    highlighted={highlightedStickerId === sticker.id}
                     onLongPress={handleLongPress}
                   />
                 ))}
               </View>
             </View>
           ) : (
-            <View style={[styles.spread, styles.desktopSpread]}>
-              {pagesToRender.map((p) => renderAlbumPage(p))}
+            <View style={styles.desktopSpread}>
+              {pagesToRender.map((p) => renderAlbumPage(p, desktopPageWidth))}
               <View pointerEvents="none" style={styles.bookFold} />
             </View>
           )}
@@ -548,27 +703,28 @@ const styles = StyleSheet.create({
 
   // ----- MOBILE -----
   mobileHeader: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
     backgroundColor: '#0A0A0A',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   mobileTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
   mobileKicker: {
     color: '#FFD600',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
+    marginBottom: 2,
   },
   mobileTitle: {
     color: '#FFFFFF',
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
@@ -577,10 +733,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
   mobileStatsText: {
     color: '#B0B0B0',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     flex: 1,
   },
@@ -617,34 +774,93 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
+    marginHorizontal: spacing.md,
+  },
+  suggestions: {
+    backgroundColor: '#1A1A1A',
+    borderColor: '#333',
+    borderWidth: 1,
+    borderRadius: radii.md,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.xs,
+    overflow: 'hidden',
+  },
+  suggestionsDesktop: {
+    position: 'absolute',
+    top: 52,
+    left: 0,
+    right: 0,
+    marginHorizontal: 0,
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 1000,
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+    gap: spacing.sm,
+  },
+  suggestionCode: {
+    color: '#FFD600',
+    fontSize: 12,
+    fontWeight: '900',
+    minWidth: 40,
+  },
+  suggestionName: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+  },
+  suggestionMatches: {
+    color: '#B0B0B0',
+    fontSize: 11,
+    fontWeight: '700',
   },
   filterScrollerMobile: {
     flexGrow: 0,
+    paddingHorizontal: spacing.md,
   },
   countryNavigatorMobile: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
   countryScrollerContent: {
-    gap: spacing.xs,
+    gap: spacing.sm,
     paddingRight: spacing.sm,
   },
-  pageDots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: spacing.sm,
+  mobileProgressBar: {
+    height: 4,
+    backgroundColor: '#333',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginHorizontal: spacing.md,
   },
-  pageDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#444',
-  },
-  pageDotActive: {
+  mobileProgressFill: {
+    height: 4,
     backgroundColor: '#FFD600',
-    width: 18,
+    borderRadius: 2,
+  },
+  mobileScroll: {
+    flex: 1,
+    paddingHorizontal: spacing.md,
+  },
+  mobilePage: {
+    backgroundColor: '#FAF6E8',
+    borderColor: '#E8DEC2',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
   },
 
   // ----- COMPARTIDO -----
@@ -656,9 +872,9 @@ const styles = StyleSheet.create({
   },
   toolbar: {
     alignItems: 'flex-start',
-    flexDirection: 'column',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.md,
     width: '100%',
   },
   titleBlock: { flex: 1 },
@@ -681,7 +897,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 2,
   },
-  progressWrap: { width: '100%' },
+  progressWrap: { flex: 1, maxWidth: 480, justifyContent: 'center' },
   controlsRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -733,7 +949,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    minHeight: 36,
+    minHeight: 38,
     justifyContent: 'center',
   },
   filterChipActive: {
@@ -742,7 +958,7 @@ const styles = StyleSheet.create({
   },
   filterText: {
     color: '#B0B0B0',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
   },
   filterTextActive: {
@@ -753,6 +969,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.xs,
     marginBottom: spacing.md,
+    zIndex: 1,
   },
   countryNavButton: {
     alignItems: 'center',
@@ -785,12 +1002,24 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     borderWidth: 1,
     minWidth: COUNTRY_BTN_WIDTH,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
   },
   countryButtonActive: {
     backgroundColor: '#FFD600',
     borderColor: '#FFD600',
+  },
+  countryButtonComplete: {
+    borderColor: '#00C853',
+    backgroundColor: 'rgba(0,200,83,0.15)',
+  },
+  completeBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 4,
+    color: '#00C853',
+    fontSize: 10,
+    fontWeight: '900',
   },
   countryButtonText: {
     color: '#B0B0B0',
@@ -815,28 +1044,47 @@ const styles = StyleSheet.create({
     borderColor: '#2A1B0E',
     borderRadius: 20,
     borderWidth: 1,
-    margin: spacing.md,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    marginTop: spacing.xs,
     padding: spacing.xs,
     shadowColor: '#000',
     shadowOpacity: 0.4,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
+    overflow: 'hidden',
   },
   desktopSpread: {
-    flex: 0,
     flexDirection: 'row',
+    alignSelf: 'stretch',
     position: 'relative',
+    zIndex: 1,
     gap: spacing.sm,
     padding: spacing.sm,
+    backgroundColor: '#3D2817',
+    borderColor: '#2A1B0E',
+    borderRadius: 20,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
   albumPage: {
     backgroundColor: '#FAF6E8',
     borderColor: '#E8DEC2',
     borderRadius: 16,
     borderWidth: 1,
-    flex: 1,
     padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  desktopPage: {
+    flexBasis: 0,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   pageTopline: {
     alignItems: 'center',

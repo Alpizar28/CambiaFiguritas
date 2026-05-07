@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { createEvent } from '../../../services/eventService';
+import { setUserCity } from '../../../services/userService';
+import { citySlug, isValidCity } from '../../../utils/citySlug';
 import { track } from '../../../services/analytics';
 import { colors, spacing, radii } from '../../../constants/theme';
 import type { EventType, AppEvent } from '../types';
@@ -29,21 +31,46 @@ type Props = {
   onCreated: (event: AppEvent) => void;
   uid: string;
   userName: string;
+  currentCity?: string;
 };
 
-export function CreateEventModal({ visible, onClose, onCreated, uid, userName }: Props) {
+async function reverseGeocodeCity(lat: number, lng: number): Promise<string | null> {
+  try {
+    const results = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+    if (!results || results.length === 0) return null;
+    const r = results[0];
+    return r.city ?? r.subregion ?? r.region ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function CreateEventModal({
+  visible,
+  onClose,
+  onCreated,
+  uid,
+  userName,
+  currentCity,
+}: Props) {
   const [title, setTitle] = useState('');
   const [type, setType] = useState<EventType>('intercambio');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
+  const [city, setCity] = useState(currentCity ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible) setCity(currentCity ?? '');
+  }, [visible, currentCity]);
 
   const reset = () => {
     setTitle('');
     setType('intercambio');
     setDescription('');
     setDate('');
+    setCity(currentCity ?? '');
     setError(null);
   };
 
@@ -67,6 +94,23 @@ export function CreateEventModal({ visible, onClose, onCreated, uid, userName }:
         return;
       }
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+
+      let resolvedCity = city.trim();
+      let citySource: 'manual' | 'reverse_geocode' | 'gps_default' = 'manual';
+      if (!resolvedCity) {
+        const auto = await reverseGeocodeCity(pos.coords.latitude, pos.coords.longitude);
+        if (auto) {
+          resolvedCity = auto;
+          citySource = 'reverse_geocode';
+        }
+      }
+      if (!isValidCity(resolvedCity)) {
+        setError('Ingresá tu ciudad (ej: Buenos Aires).');
+        setSaving(false);
+        return;
+      }
+      const slug = citySlug(resolvedCity);
+
       const event = await createEvent({
         title: title.trim(),
         type,
@@ -76,8 +120,17 @@ export function CreateEventModal({ visible, onClose, onCreated, uid, userName }:
         date: parsed.toISOString(),
         createdBy: uid,
         creatorName: userName,
+        cityName: resolvedCity,
+        citySlug: slug,
       });
       track({ name: 'event_created', params: { type } });
+      track({ name: 'event_city_set', params: { source: citySource } });
+
+      // Persistir city del user si no la tenía o cambió
+      if (!currentCity || currentCity.trim() !== resolvedCity) {
+        setUserCity(uid, resolvedCity).catch(() => {});
+      }
+
       onCreated(event);
       reset();
       onClose();
@@ -141,6 +194,18 @@ export function CreateEventModal({ visible, onClose, onCreated, uid, userName }:
             />
           </Field>
 
+          <Field label="Tu ciudad *">
+            <TextInput
+              style={styles.input}
+              value={city}
+              onChangeText={setCity}
+              placeholder="Buenos Aires"
+              placeholderTextColor={colors.textMuted}
+              maxLength={80}
+              autoCorrect={false}
+            />
+          </Field>
+
           <Field label="Descripción (opcional)">
             <TextInput
               style={[styles.input, styles.textarea]}
@@ -155,7 +220,7 @@ export function CreateEventModal({ visible, onClose, onCreated, uid, userName }:
           </Field>
 
           <Text style={styles.locationNote}>
-            📍 La ubicación se tomará de tu GPS al guardar.
+            📍 La ubicación exacta se tomará de tu GPS al guardar.
           </Text>
 
           {error && <Text style={styles.errorText}>{error}</Text>}

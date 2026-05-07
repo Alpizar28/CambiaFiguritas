@@ -47,7 +47,8 @@ type AnalyticsEvent =
   | { name: 'album_filter_changed'; params: { filter: string } }
   | { name: 'matches_searched'; params: { matchesFound: number } }
   | { name: 'match_opened'; params: { matchUid: string; score: number } }
-  | { name: 'match_whatsapp_clicked'; params: { matchUid: string } }
+  | { name: 'match_whatsapp_clicked'; params: { matchUid: string; expanded?: boolean } }
+  | { name: 'match_details_opened'; params: { matchUid: string } }
   | { name: 'match_profile_opened'; params: { matchUid: string } }
   | { name: 'match_map_clicked'; params: { matchUid: string } }
   | { name: 'match_clipboard_copied'; params: { matchUid: string } }
@@ -55,7 +56,48 @@ type AnalyticsEvent =
   | { name: 'event_created'; params: { type: string } }
   | { name: 'event_deleted' }
   | { name: 'event_maps_opened' }
-  | { name: 'screen_view'; params: { screen: string } };
+  | { name: 'screen_view'; params: { screen: string } }
+  | { name: 'onboarding_started' }
+  | { name: 'onboarding_skipped'; params: { atSlide: number } }
+  | { name: 'onboarding_completed' }
+  | { name: 'share_album_clicked'; params: { stats: string } }
+  | { name: 'share_image_generated'; params: { result: string } }
+  | { name: 'matches_filter_changed'; params: { filter: string } }
+  | { name: 'web_vital_reported'; params: { metric: string; value: number; rating: string } }
+  | { name: 'sticker_searched_by_code'; params: { code: string; matched: boolean } }
+  | { name: 'demo_entered' }
+  | { name: 'demo_login_clicked' }
+  | { name: 'matches_empty_cta_clicked'; params: { reason: string } }
+  | { name: 'wishlist_added'; params: { stickerId: string } }
+  | { name: 'wishlist_removed'; params: { stickerId: string } }
+  | { name: 'reputation_voted'; params: { targetUid: string; vote: 'up' | 'down' } }
+  | { name: 'tooltip_shown'; params: { stepId: string } }
+  | { name: 'tooltip_dismissed'; params: { stepId: string } }
+  | { name: 'landing_viewed' }
+  | { name: 'landing_cta_clicked'; params: { cta: string } }
+  | { name: 'rankings_viewed'; params: { scope: string } }
+  | { name: 'progress_timeline_viewed' }
+  | { name: 'album_search_fuzzy_hit'; params: { needleLen: number } }
+  | { name: 'og_share_clicked'; params: { method: string } }
+  | { name: 'match_limit_reached'; params: { used: number; cap: number } }
+  | { name: 'match_slot_unlocked_via_ad'; params: { adsWatchedToday: number } }
+  | { name: 'premium_checkout_started' }
+  | { name: 'premium_purchase_completed' }
+  | { name: 'premium_purchase_failed'; params: { reason: string } }
+  | { name: 'ad_rewarded_started' }
+  | { name: 'ad_rewarded_completed'; params: { durationMs: number } }
+  | { name: 'premium_granted'; params: { source: 'tilopay' | 'play_billing'; alreadyGranted: boolean } }
+  | { name: 'play_billing_init_failed'; params: { reason: string } }
+  | { name: 'events_zone_resolved'; params: { mode: 'gps' | 'citySlug' | 'blocked'; hasCity: boolean } }
+  | { name: 'events_zone_empty_create_clicked' }
+  | { name: 'events_no_location_blocked'; params: { canAskAgain: boolean } }
+  | { name: 'events_filtered_by_zone'; params: { mode: string; resultCount: number } }
+  | { name: 'event_city_set'; params: { source: 'manual' | 'reverse_geocode' | 'gps_default' } }
+  | { name: 'matches_filter_default_chosen'; params: { filter: string; hasGps: boolean; hasCity: boolean } }
+  | { name: 'match_batch_saved'; params: { size: number; filter: string } }
+  | { name: 'match_history_opened'; params: { batchCount: number } }
+  | { name: 'match_history_batch_expanded'; params: { batchId: string; ageDays: number } }
+  | { name: 'match_history_whatsapp_clicked'; params: { matchUid: string; ageDays: number } };
 
 let analyticsInstance: Analytics | null = null;
 let initPromise: Promise<Analytics | null> | null = null;
