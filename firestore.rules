@@ -12,7 +12,8 @@ service cloud.firestore {
     }
 
     // users: perfil público de cada usuario (necesario para mostrar matches y eventos).
-    // Solo el dueño puede crear/editar su documento.
+    // Solo el dueño puede crear/editar su documento (excepto reputación que puede
+    // actualizar cualquier usuario autenticado vía recordReputationVote).
     match /users/{uid} {
       allow read: if isSignedIn();
       allow create: if isOwner(uid)
@@ -21,11 +22,18 @@ service cloud.firestore {
                     && request.resource.data.name is string
                     && request.resource.data.name.size() <= 80
                     && request.resource.data.email.size() <= 200;
-      // Update: dueño no puede mutar uid, email ni createdAt
+      // Update propio (dueño). NO puede modificar reputationUp/Down/Count
+      // (solo Cloud Functions con admin SDK los toca).
       allow update: if isOwner(uid)
                     && request.resource.data.uid == resource.data.uid
                     && request.resource.data.email == resource.data.email
                     && request.resource.data.createdAt == resource.data.createdAt
+                    && (resource.data.reputationUp == null ||
+                        request.resource.data.reputationUp == resource.data.reputationUp)
+                    && (resource.data.reputationDown == null ||
+                        request.resource.data.reputationDown == resource.data.reputationDown)
+                    && (resource.data.reputationCount == null ||
+                        request.resource.data.reputationCount == resource.data.reputationCount)
                     && (!('whatsapp' in request.resource.data) ||
                         (request.resource.data.whatsapp is string &&
                          request.resource.data.whatsapp.size() <= 30))
@@ -34,8 +42,79 @@ service cloud.firestore {
                          request.resource.data.city.size() <= 80))
                     && (!('name' in request.resource.data) ||
                         (request.resource.data.name is string &&
-                         request.resource.data.name.size() <= 80));
+                         request.resource.data.name.size() <= 80))
+                    && (!('fcmToken' in request.resource.data) ||
+                        request.resource.data.fcmToken == null ||
+                        (request.resource.data.fcmToken is string &&
+                         request.resource.data.fcmToken.size() <= 200))
+                    // Premium y campos de billing/cap son inmutables client-side.
+                    // Solo Cloud Functions con admin SDK los toca.
+                    && (resource.data.premium == null ||
+                        request.resource.data.premium == resource.data.premium)
+                    && (resource.data.adsWatchedToday == null ||
+                        request.resource.data.adsWatchedToday == resource.data.adsWatchedToday)
+                    && (resource.data.adsWatchedDate == null ||
+                        request.resource.data.adsWatchedDate == resource.data.adsWatchedDate)
+                    && (resource.data.lastAdUnlockAt == null ||
+                        request.resource.data.lastAdUnlockAt == resource.data.lastAdUnlockAt)
+                    && (!('userTimezone' in request.resource.data) ||
+                        request.resource.data.userTimezone == null ||
+                        (request.resource.data.userTimezone is string &&
+                         request.resource.data.userTimezone.size() <= 80));
       allow delete: if isOwner(uid);
+
+      // Subcollection: votos de reputación.
+      // Cliente NO escribe acá. Solo Cloud Function admin puede.
+      // Cliente puede LEER su propio voto (para saber si ya votó a alguien).
+      match /votes/{voterUid} {
+        allow read: if isSignedIn() && request.auth.uid == voterUid;
+        allow write: if false;
+      }
+
+      // Subcollection: snapshots diarios para timeline de progreso personal.
+      // Solo el dueño puede leer/escribir su propia historia.
+      match /dailyStats/{yyyymmdd} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+                      && request.resource.data.date is string
+                      && request.resource.data.date.size() <= 10
+                      && request.resource.data.ownedCount is int
+                      && request.resource.data.ownedCount >= 0
+                      && request.resource.data.ownedCount <= 1000;
+        allow delete: if false;
+      }
+
+      // Subcollection: contador diario de matches consumidos. Backend-only.
+      match /matchSlots/{day} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      // Subcollection: audit trail de entitlements premium. Backend-only.
+      match /entitlements/{source} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      // Subcollection: historial de búsquedas de matches. Owner-only.
+      // Cap 10 matches por batch (premium top); filterUsed enum.
+      match /matchHistory/{batchId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+                      && request.resource.data.matches is list
+                      && request.resource.data.matches.size() <= 10
+                      && request.resource.data.filterUsed in ['mi_ciudad', '15km', '50km', 'todos']
+                      && request.resource.data.createdAt is timestamp;
+        allow update: if false;
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    // orders: pagos en proceso (TiloPay, Play Billing). Lectura solo del dueño.
+    // Escritura backend-only.
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && request.auth.uid == resource.data.uid;
+      allow write: if false;
     }
 
     // userAlbums: estado del album por usuario. Lectura abierta a usuarios autenticados
@@ -61,6 +140,12 @@ service cloud.firestore {
                     && request.resource.data.lng >= -180 && request.resource.data.lng <= 180
                     && request.resource.data.date is string
                     && request.resource.data.type in ['intercambio', 'meetup', 'tienda']
+                    && request.resource.data.cityName is string
+                    && request.resource.data.cityName.size() > 0
+                    && request.resource.data.cityName.size() <= 80
+                    && request.resource.data.citySlug is string
+                    && request.resource.data.citySlug.size() > 0
+                    && request.resource.data.citySlug.size() <= 60
                     && (!('description' in request.resource.data) ||
                         (request.resource.data.description is string &&
                          request.resource.data.description.size() <= 500))
@@ -72,10 +157,20 @@ service cloud.firestore {
                     && request.resource.data.createdBy == resource.data.createdBy
                     && request.resource.data.title.size() > 0
                     && request.resource.data.title.size() <= 100
+                    && (resource.data.citySlug == null ||
+                        request.resource.data.citySlug == resource.data.citySlug)
+                    && (resource.data.cityName == null ||
+                        request.resource.data.cityName == resource.data.cityName)
                     && (!('description' in request.resource.data) ||
                         request.resource.data.description.size() <= 500);
       allow delete: if isSignedIn()
                     && resource.data.createdBy == request.auth.uid;
+    }
+
+    // Rankings agregados por Cloud Function. Lectura abierta (auth required), escritura solo backend.
+    match /rankings/{document=**} {
+      allow read: if isSignedIn();
+      allow write: if false;
     }
 
     // Por defecto, todo lo demás bloqueado.

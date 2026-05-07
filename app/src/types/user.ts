@@ -9,4 +9,11 @@ export type AppUser = {
   lng?: number;
   premium: boolean;
   createdAt: string;
+  reputationUp?: number;
+  reputationDown?: number;
+  reputationCount?: number;
+  userTimezone?: string;
+  adsWatchedToday?: number;
+  adsWatchedDate?: string;
+  lastAdUnlockAt?: number;
 };

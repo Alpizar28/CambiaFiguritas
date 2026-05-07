@@ -9,6 +9,7 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { signOut } from 'firebase/auth';
@@ -18,8 +19,12 @@ import { useUserStore } from '../../store/userStore';
 import { useAlbumStore } from '../../store/albumStore';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { shareText } from '../../utils/share';
+import { shareStatsImage } from '../../utils/shareImage';
 import { track } from '../../services/analytics';
 import { StatsBreakdown } from './StatsBreakdown';
+import { ProgressTimeline } from './components/ProgressTimeline';
+import { PremiumCard } from './components/PremiumCard';
+import { Tooltip } from '../../components/Tooltip';
 import { colors, spacing, radii } from '../../constants/theme';
 
 export function ProfileScreen() {
@@ -34,19 +39,60 @@ export function ProfileScreen() {
   const [city, setCity] = useState(user?.city ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
+  const [imageFeedback, setImageFeedback] = useState<string | null>(null);
+  const [generatingImage, setGeneratingImage] = useState(false);
 
   const handleLogout = () => signOut(auth);
+
+  const notify = (title: string, msg: string) => {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined') window.alert(`${title}\n\n${msg}`);
+    } else {
+      Alert.alert(title, msg);
+    }
+  };
 
   const handleShare = async () => {
     const stats = `${owned}/${total} figuritas (${repeated} repes)`;
     const message = `Estoy completando el album del Mundial 2026: ${stats}. Sumate a CambiaFiguritas para encontrar matches e intercambiar:`;
-    const url = 'https://cambiafiguritas.web.app';
+    const url = user?.uid
+      ? `https://cambiafiguritas.web.app/u/${user.uid}`
+      : 'https://cambiafiguritas.web.app';
     const result = await shareText(message, url);
     track({ name: 'share_album_clicked', params: { stats } });
-    if (result === 'copied') {
-      Alert.alert('Copiado', 'Link copiado al portapapeles.');
+    track({ name: 'og_share_clicked', params: { method: 'profile_link' } });
+    if (result === 'shared') {
+      setShareFeedback('✓ Compartido');
+    } else if (result === 'copied') {
+      setShareFeedback('✓ Link copiado al portapapeles');
     } else if (result === 'error') {
-      Alert.alert('Error', 'No se pudo compartir. Intentá de nuevo.');
+      notify('Error', 'No se pudo compartir. Intentá de nuevo.');
+    }
+    if (result === 'shared' || result === 'copied') {
+      setTimeout(() => setShareFeedback(null), 2500);
+    }
+  };
+
+  const handleShareImage = async () => {
+    setGeneratingImage(true);
+    setImageFeedback(null);
+    try {
+      const result = await shareStatsImage({
+        userName: user?.name ?? '',
+        owned,
+        total,
+        repeated,
+        missing,
+      });
+      track({ name: 'share_image_generated', params: { result } });
+      if (result === 'shared') setImageFeedback('✓ Compartido');
+      else if (result === 'downloaded') setImageFeedback('✓ Descargado. Subilo a tu story');
+      else if (result === 'unsupported') notify('No disponible', 'Por ahora la imagen sólo se genera en navegador. Probá desde el celular o desktop.');
+      else if (result === 'error') notify('Error', 'No se pudo generar la imagen.');
+    } finally {
+      setGeneratingImage(false);
+      setTimeout(() => setImageFeedback(null), 3000);
     }
   };
 
@@ -59,7 +105,7 @@ export function ProfileScreen() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {
-      Alert.alert('Error', 'No se pudo guardar. Verificá tu conexión.');
+      notify('Error', 'No se pudo guardar. Verificá tu conexión.');
     } finally {
       setSaving(false);
     }
@@ -68,6 +114,13 @@ export function ProfileScreen() {
   const isDirty = whatsapp !== (user?.whatsapp ?? '') || city !== (user?.city ?? '');
 
   return (
+    <View style={{ flex: 1 }}>
+      <Tooltip
+        id="profile-share-image"
+        title="🖼 Compartí tu progreso"
+        message="Generá una imagen lista para subir a tus stories y mostrar cómo va tu álbum."
+        position="bottom"
+      />
     <ScrollView
       style={styles.container}
       contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.md }]}
@@ -82,7 +135,14 @@ export function ProfileScreen() {
         )}
         <Text style={styles.name}>{user?.name ?? ''}</Text>
         <Text style={styles.email}>{user?.email ?? ''}</Text>
+        {user?.premium ? (
+          <View style={styles.premiumPill}>
+            <Text style={styles.premiumPillText}>✨ Premium activo</Text>
+          </View>
+        ) : null}
       </View>
+
+      {!user?.premium ? <PremiumCard /> : null}
 
       <View style={styles.stats}>
         <StatBox label="Obtenidas" value={owned} color={colors.owned} />
@@ -139,9 +199,29 @@ export function ProfileScreen() {
 
       <StatsBreakdown />
 
+      <ProgressTimeline />
+
       <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-        <Text style={styles.shareButtonText}>📤 Compartir mi progreso</Text>
+        <Text style={styles.shareButtonText}>
+          {shareFeedback ?? '📤 Compartir mi progreso'}
+        </Text>
       </TouchableOpacity>
+
+      {Platform.OS === 'web' ? (
+        <TouchableOpacity
+          style={[styles.shareImageButton, generatingImage && styles.saveButtonDisabled]}
+          onPress={handleShareImage}
+          disabled={generatingImage}
+        >
+          {generatingImage ? (
+            <ActivityIndicator color={colors.background} />
+          ) : (
+            <Text style={styles.shareImageButtonText}>
+              {imageFeedback ?? '🖼 Compartir como imagen'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      ) : null}
 
       <TouchableOpacity style={styles.tutorialButton} onPress={resetOnboarding}>
         <Text style={styles.tutorialText}>Ver tutorial otra vez</Text>
@@ -151,6 +231,7 @@ export function ProfileScreen() {
         <Text style={styles.logoutText}>Cerrar sesion</Text>
       </TouchableOpacity>
     </ScrollView>
+    </View>
   );
 }
 
@@ -200,6 +281,19 @@ const styles = StyleSheet.create({
   email: {
     color: colors.textMuted,
     fontSize: 14,
+  },
+  premiumPill: {
+    backgroundColor: '#FFD700',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: 999,
+    marginTop: spacing.sm,
+  },
+  premiumPillText: {
+    color: '#0A0A0A',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   stats: {
     flexDirection: 'row',
@@ -286,6 +380,20 @@ const styles = StyleSheet.create({
   },
   shareButtonText: {
     color: colors.background,
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  shareImageButton: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  shareImageButtonText: {
+    color: colors.accent,
     fontWeight: '700',
     fontSize: 15,
   },

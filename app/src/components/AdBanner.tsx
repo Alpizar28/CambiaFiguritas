@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { adUnitIds } from '../services/ads';
+import { useUserStore } from '../store/userStore';
 
 type Props = {
   inline?: boolean;
@@ -13,6 +14,8 @@ const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreCl
 let initialized = false;
 
 export function AdBanner({ inline = false }: Props) {
+  const isPremium = useUserStore((s) => s.user?.premium === true);
+  if (isPremium) return null;
   if (isExpoGo) return null;
   return <NativeAd inline={inline} />;
 }

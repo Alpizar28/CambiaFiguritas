@@ -8,12 +8,14 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "build:web": "rm -rf dist && expo export -p web && node scripts/patch-web-bundle.js"
+    "build:web": "rm -rf dist && expo export -p web --source-maps && node scripts/patch-web-bundle.js",
+    "sentry:upload": "bash scripts/upload-sourcemaps.sh"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.15.11",
     "@react-navigation/native": "^7.2.2",
+    "@sentry/browser": "^10.51.0",
     "expo": "~54.0.33",
     "expo-auth-session": "~7.0.11",
     "expo-constants": "~18.0.13",
@@ -34,6 +36,7 @@
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",
     "react-native-web": "^0.21.0",
+    "web-vitals": "^5.2.0",
     "zustand": "^5.0.13"
   },
   "devDependencies": {

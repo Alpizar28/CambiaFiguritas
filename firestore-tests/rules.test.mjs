@@ -47,6 +47,8 @@ const validEvent = (creatorUid) => ({
   type: 'intercambio',
   description: 'Plaza Italia',
   creatorName: 'Pablo',
+  cityName: 'Buenos Aires',
+  citySlug: 'buenos-aires',
 });
 
 describe('users', () => {
@@ -189,6 +191,89 @@ describe('events', () => {
     });
     const bob = testEnv.authenticatedContext('bob').firestore();
     await assertFails(deleteDoc(doc(bob, 'events/e1')));
+  });
+
+  test('NO se puede crear sin citySlug', async () => {
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    const { citySlug, ...rest } = validEvent('alice');
+    await assertFails(setDoc(doc(alice, 'events/e1'), rest));
+  });
+
+  test('NO se puede crear con cityName >80 chars', async () => {
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await assertFails(setDoc(doc(alice, 'events/e1'), { ...validEvent('alice'), cityName: 'x'.repeat(81) }));
+  });
+
+  test('owner NO puede cambiar citySlug en update', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'events/e1'), validEvent('alice'));
+    });
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await assertFails(updateDoc(doc(alice, 'events/e1'), { citySlug: 'rosario' }));
+  });
+});
+
+describe('matchHistory', () => {
+  const validBatch = (n = 3) => ({
+    filterUsed: 'todos',
+    userCity: 'Buenos Aires',
+    userLat: -34.6,
+    userLng: -58.4,
+    matches: Array.from({ length: n }, (_, i) => ({
+      uid: `m${i}`,
+      name: `Match ${i}`,
+      photoUrl: null,
+      city: 'Buenos Aires',
+      score: 5,
+      distanceKm: 3,
+      iNeedFromThem: 2,
+      theyNeedFromMe: 3,
+      iNeedIds: [],
+      theyNeedIds: [],
+      iNeedPriorityIds: [],
+      premium: false,
+      whatsapp: '',
+    })),
+    createdAt: new Date(),
+  });
+
+  test('owner puede crear batch válido', async () => {
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await assertSucceeds(setDoc(doc(alice, 'users/alice/matchHistory/123'), validBatch(5)));
+  });
+
+  test('NO se puede crear batch >10 matches', async () => {
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await assertFails(setDoc(doc(alice, 'users/alice/matchHistory/123'), validBatch(11)));
+  });
+
+  test('NO se puede crear con filterUsed inválido', async () => {
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await assertFails(setDoc(doc(alice, 'users/alice/matchHistory/123'), { ...validBatch(3), filterUsed: 'invalid' }));
+  });
+
+  test('owner SÍ puede leer su propio batch', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users/alice/matchHistory/123'), validBatch(3));
+    });
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await assertSucceeds(getDoc(doc(alice, 'users/alice/matchHistory/123')));
+  });
+
+  test('user NO puede leer batch ajeno', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users/alice/matchHistory/123'), validBatch(3));
+    });
+    const bob = testEnv.authenticatedContext('bob').firestore();
+    await assertFails(getDoc(doc(bob, 'users/alice/matchHistory/123')));
+  });
+
+  test('owner puede borrar su batch', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users/alice/matchHistory/123'), validBatch(3));
+    });
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await assertSucceeds(deleteDoc(doc(alice, 'users/alice/matchHistory/123')));
   });
 });
 

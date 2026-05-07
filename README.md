@@ -10,16 +10,47 @@ App multiplataforma para gestionar el álbum del **Mundial 2026**, encontrar int
 
 ## Funcionalidades
 
+### Core
 - 🗂️ **Álbum completo**: 981 figuritas (48 países × 20 + 21 especiales) con orden oficial del CSV.
 - 🔄 **Estados por figurita**: faltante, obtenida, repetida (con contador), especial.
 - 💾 **Persistencia local + cloud**: AsyncStorage como source of truth + Firestore como backup cross-device.
-- 🤝 **Matching geográfico**: encontrá usuarios cercanos con figuritas que vos necesitás.
-- 📍 **Eventos**: mapa con intercambios, meetups y tiendas, geolocalizados.
+- 🔍 **Búsqueda fuzzy cross-país**: Levenshtein distance, tolerante a typos ("argntina" → Argentina).
+- 🌟 **Wishlist**: marcar figuritas prioritarias, boost en scoring de matches.
+
+### Matching (Tinder-style)
+- 🎯 **Top 5 free / Top 10 premium** por búsqueda — solo los mejores, no inunda.
+- 📍 **Filtros estrictos por zona**: chips "Mi ciudad" / "15 km" / "50 km" / "Todos". Default 15km.
+- 📜 **Historial persistido**: cada búsqueda se guarda en `users/{uid}/matchHistory`. WhatsApp sigue clicable con prefijo "del DD/MM".
+- ⭐ **Score combinado**: necesidades mutuas + wishlist boost + distancia.
+- 🤝 **Intercambio perfecto**: badge dorado cuando swap recíproco balanceado.
+- ✓ **Verified badge**: usuarios con ≥20 reputaciones y ≥85% positivas.
+- 🛡️ **Cap diario server-enforced**: 3 búsquedas/día free (premium ilimitado), recompensable con anuncios.
+
+### Eventos por zona
+- 📍 **Filtro estricto**: GPS preferido (radio dinámico) + fallback `user.city` slug.
+- 🏙️ **CityName + citySlug** por evento, con alias map (CABA → buenos-aires).
+- 🆕 **FAB + EmptyZoneState** "¿Sos el primero en tu zona?".
+- 🚫 **NoLocationBanner** si user sin GPS ni ciudad.
+
+### Monetización
+- ✨ **Premium USD 2.99** pago único cross-platform: Web (TiloPay) + Android (Play Billing).
+- 🔄 **Cross-platform sync**: misma cuenta Google → premium se refleja en segundos vía `onSnapshot`.
+- 💸 **Audit trail**: subcollection `users/{uid}/entitlements/{source}` con idempotencia por externalId.
+- 🎬 **Rewarded ads**: countdown 15s+ desbloquea +1 match cap diario.
+
+### Compartir / OG
+- 📤 **OG dinámico** `/u/:uid` + `/og/:uid.png` Cloud Function genera preview rich con stats.
+- 📊 **Stats breakdown** por país.
+- 📈 **Progress timeline** (últimos 14 días).
+
+### Infra
 - 🔐 **Auth Google**: OAuth con Firebase Auth (web + Expo).
 - 📱 **WhatsApp deep link**: contacto directo con la persona del match.
 - 📊 **Analytics + Ads**: Firebase Analytics + AdMob (test IDs por defecto).
-- ⚡ **Performance**: virtualización, `React.memo`, selectors granulares por sticker.
-- 🛡️ **Reglas Firestore**: validación server-side por usuario.
+- 🔔 **Push FCM**: notificaciones thank-you premium + álbum updates.
+- 🛡️ **Reglas Firestore**: validación server-side, 32 tests automáticos.
+- ⚡ **PWA**: service worker, install prompt, manifest.
+- 🐛 **Sentry**: error tracking web/native con sourcemaps.
 
 ---
 
@@ -31,12 +62,15 @@ App multiplataforma para gestionar el álbum del **Mundial 2026**, encontrar int
 | Lenguaje        | TypeScript                                   |
 | Estado          | Zustand (+ persist con AsyncStorage)         |
 | Navegación      | React Navigation (Bottom Tabs)               |
-| Backend         | Firebase (Auth + Firestore + Hosting)        |
+| Backend         | Firebase (Auth + Firestore + Functions v2 + Hosting + FCM) |
+| Cloud Functions | Node 20, callable + HTTPS + scheduled         |
 | Mapas           | `react-native-maps` (native) / Leaflet (web) |
 | Ads             | `react-native-google-mobile-ads` (AdMob)     |
 | Analytics       | Firebase Analytics                           |
+| Pagos           | TiloPay (web) + Google Play Billing (Android) |
+| Errores         | Sentry (web + native, sourcemaps)            |
 | Build móvil     | EAS Build                                    |
-| Hosting web     | Firebase Hosting                             |
+| Hosting web     | Firebase Hosting + PWA service worker        |
 
 ---
 
@@ -51,10 +85,15 @@ App multiplataforma para gestionar el álbum del **Mundial 2026**, encontrar int
 | 4 - Persistencia Firestore + AsyncStorage | ✅   |
 | 5 - Matching + distancia                | ✅     |
 | 6 - Eventos + mapa                      | ✅     |
-| 7 - Reglas seguridad                    | ✅     |
-| 8 - Ads + Analytics (test IDs)          | ✅     |
+| 7 - Reglas seguridad + 32 tests         | ✅     |
+| 8 - Ads + Analytics                     | ✅     |
 | 9 - Performance + Pulido                | ✅     |
-| **10 - Publicación MVP**                | 🚧 web live, Android EAS pendiente |
+| 10 - Publicación MVP web                | ✅     |
+| Sprint A - Daily digest, perfect trade, verified, stats, fuzzy, OG | ✅ |
+| Sprint B - Premium cross-platform, match cap, rewarded ads | ✅ |
+| Sprint C - Eventos por zona             | ✅     |
+| Sprint D - Matches Tinder-style + historial | ✅ |
+| **Pendiente** - TiloPay keys reales, EAS Android build, AdMob real | 🚧 |
 
 ---
 
@@ -105,55 +144,78 @@ npm start
 CambiaFiguritas/
 ├── README.md                  ← este archivo
 ├── arquitectura.md            ← decisiones de diseño y UX
+├── MANUAL_SETUP.md            ← prerequisitos manuales (TiloPay, Play Console, AdMob, EAS)
 ├── plan-fases-implementacion.md ← roadmap original
-├── firebase.json              ← Hosting + Firestore config
+├── firebase.json              ← Hosting + Firestore + Functions config
 ├── .firebaserc                ← project ID (cambiafiguritas)
 ├── firestore.rules            ← reglas seguridad
-├── firestore.indexes.json     ← índices compuestos (vacío)
+├── firestore.indexes.json     ← índices compuestos (events.citySlug + date)
+├── firestore-tests/           ← 32 tests rules con emulator
+├── functions/                 ← Cloud Functions (Node 20 v2)
+│   └── src/
+│       ├── index.ts                       ← export central
+│       ├── reputation.ts                  ← recordReputationVote
+│       ├── notifications.ts               ← onAlbumUpdateNotify + sendPushSafe
+│       ├── rankings.ts                    ← aggregateRankings (1h cron)
+│       ├── digest.ts                      ← dailyDigest scheduled
+│       ├── og.ts                          ← /u/:uid + /og/:uid.png
+│       ├── matchSlots.ts                  ← consumeMatchSlot + unlockMatchSlot
+│       ├── tilopay.ts                     ← createTilopayCheckout + webhook + devCompleteOrder
+│       ├── playBilling.ts                 ← verifyPlayPurchase
+│       └── payments/entitlement.ts        ← grantPremium helper compartido
 ├── tasks/                     ← documentación de operación
-│   ├── deploy.md              ← cómo deployar (web + android)
-│   ├── pendientes.md          ← TODO actual + checklist
-│   ├── firestore-rules.md     ← detalles reglas
-│   ├── analytics-ads-setup.md ← cómo activar AdMob real
-│   ├── todo.md                ← log histórico de fases
-│   └── lessons.md             ← aprendizajes técnicos
-├── album mundial 2026 stiker .pdf ← álbum oficial (referencia)
-├── StickerAlbumWC2026.xlsm - Stickers.csv ← orden oficial
 └── app/                       ← código fuente Expo
-    ├── App.tsx                ← root component + auth gate
-    ├── app.json               ← Expo config (icons, plugins, perms)
+    ├── App.tsx                ← root + auth gate + subscribeUserDoc
+    ├── app.json               ← Expo config
     ├── eas.json               ← perfiles EAS Build
-    ├── package.json
     ├── scripts/
-    │   └── patch-web-bundle.js ← post-export patch (import.meta + rehash)
-    ├── assets/                ← icon, splash, favicon
+    │   ├── patch-web-bundle.js     ← post-export patch + PWA + sw + rehash
+    │   └── upload-sourcemaps.sh    ← Sentry sourcemap upload
     └── src/
-        ├── app/AppNavigator.tsx     ← bottom tabs
-        ├── components/              ← UI compartida (icons, banner, skeleton, etc.)
-        ├── constants/theme.ts       ← paleta + spacing + radii
+        ├── app/AppNavigator.tsx     ← bottom tabs (5)
+        ├── components/              ← AdBanner, Tooltip, Skeleton, ErrorBoundary, icons
+        ├── constants/theme.ts       ← paleta + spacing + radii + countryColors
         ├── features/
-        │   ├── album/               ← grid figuritas + filtros + páginas país
+        │   ├── album/               ← grid figuritas + filtros + fuzzy search
         │   ├── auth/LoginScreen.tsx
-        │   ├── matching/            ← MatchCard + MatchesScreen
-        │   ├── events/              ← EventsScreen + mapa + modal crear
-        │   └── profile/ProfileScreen.tsx
-        ├── hooks/useAlbumSync.ts    ← debounce save Firestore
+        │   ├── demo/                ← demo mode con sample data
+        │   ├── landing/             ← landing pública
+        │   ├── matching/            ← MatchRow, MatchDetailModal, MatchHistoryScreen, filtros zona
+        │   ├── events/              ← EventsScreen + filtro zona + FAB + modales city
+        │   ├── profile/             ← ProgressTimeline, PremiumCard
+        │   └── rankings/            ← RankingsScreen
+        ├── hooks/useAlbumSync.ts
         ├── services/
-        │   ├── firebase.ts          ← config + init
-        │   ├── userService.ts       ← getOrCreateUser
-        │   ├── albumSyncService.ts  ← load/save album
-        │   ├── matchingService.ts   ← findMatches + score
-        │   ├── eventService.ts      ← CRUD eventos
-        │   ├── analytics.ts         ← wrapper Firebase Analytics
-        │   └── ads.ts               ← AdMob ID resolver
+        │   ├── firebase.ts                ← config + init
+        │   ├── userService.ts             ← getOrCreateUser, subscribeUserDoc, saveUserLocation, setUserCity
+        │   ├── albumSyncService.ts
+        │   ├── matchingService.ts         ← findMatches (pool 200 sin slice)
+        │   ├── matchSlotsService.ts       ← consumeMatchSlot/unlockMatchSlot wrappers
+        │   ├── matchHistoryService.ts     ← saveMatchBatch + listMatchBatches + prune
+        │   ├── eventService.ts            ← fetchEvents con EventFilter (gps/citySlug/none)
+        │   ├── rankingsService.ts         ← rankings agregados
+        │   ├── dailyStatsService.ts       ← snapshots diarios
+        │   ├── playBilling.ts             ← lazy require react-native-iap
+        │   ├── pushNotifications.ts       ← FCM token registration
+        │   ├── webVitals.ts               ← Core Web Vitals → analytics
+        │   ├── sentry.ts                  ← Sentry init web + native
+        │   ├── analytics.ts               ← typed catalog ~60 eventos
+        │   └── ads.ts
         ├── store/                   ← Zustand stores
-        │   ├── albumStore.ts        ← persist + statuses + repeatedCounts
+        │   ├── albumStore.ts
         │   ├── userStore.ts
         │   ├── matchStore.ts
         │   ├── eventStore.ts
-        │   └── syncStore.ts
-        ├── types/                   ← navigation, user
-        └── utils/haptics.ts
+        │   ├── syncStore.ts
+        │   ├── wishlistStore.ts          ← persist con AsyncStorage
+        │   ├── tutorialStore.ts
+        │   └── landingStore.ts
+        ├── utils/
+        │   ├── haptics.ts
+        │   ├── distance.ts               ← haversineKm + formatDistance
+        │   ├── citySlug.ts                ← slug + alias map AR (CABA→buenos-aires)
+        │   └── shareImage.ts
+        └── types/                   ← navigation, user
 ```
 
 ---
@@ -268,20 +330,31 @@ Implementado en `app/scripts/patch-web-bundle.js`.
                   │
        ┌──────────┴──────────┐
        │                     │
-   Web (export)          Android/iOS
+   Web (export+PWA)      Android/iOS
    Firebase Hosting      EAS Build → Stores
        │                     │
        └──────────┬──────────┘
                   │
             Firebase SDK
                   │
-   ┌──────────────┼──────────────────┐
-   │              │                  │
-Firestore     Firebase Auth     Firebase Analytics
+   ┌──────────────┼──────────────────────────┐
+   │              │             │            │
+Firestore  Firebase Auth   Functions v2   Analytics + FCM
    │
-   ├── users/{uid}            (perfil)
-   ├── userAlbums/{uid}        (statuses + repeatedCounts)
-   └── events/{id}             (intercambios + GPS)
+   ├── users/{uid}                       (perfil + premium + city/lat/lng + tz)
+   │     ├── votes/{voterUid}            (reputación, backend-only)
+   │     ├── dailyStats/{yyyymmdd}       (snapshots progreso)
+   │     ├── matchSlots/{day}            (cap diario, backend-only)
+   │     ├── entitlements/{source}       (audit premium, backend-only)
+   │     └── matchHistory/{batchId}      (batches anteriores top 5/10)
+   ├── userAlbums/{uid}                  (statuses + repeatedCounts)
+   ├── events/{id}                       (intercambios + GPS + cityName + citySlug)
+   ├── orders/{orderId}                  (pagos TiloPay/Play, backend-write)
+   └── rankings/...                      (agregados por Cloud Function)
+
+Cloud Functions:
+  reputation, notifications, rankings (1h cron), digest (daily),
+  og (HTTPS), matchSlots, tilopay (callable+webhook), playBilling
 ```
 
 Detalles de UX, paleta y filosofía en [`arquitectura.md`](./arquitectura.md).
@@ -291,20 +364,27 @@ Detalles de UX, paleta y filosofía en [`arquitectura.md`](./arquitectura.md).
 ## Workflow git (deploy completo)
 
 ```bash
-# 1. Hacer cambios en código
-cd app && npm run typecheck
+# 1. Cambios en app
+cd app && npm run typecheck && npm run build:web && cd ..
 
-# 2. Build web local
-npm run build:web && cd ..
+# 2. Cambios en functions (si aplica)
+cd functions && npm run build && cd ..
 
-# 3. Test local opcional
-cd app && npx serve dist -l 5050 && cd ..
+# 3. Cambios en rules (correr tests)
+cd firestore-tests && npm test && cd ..
 
-# 4. Deploy a producción
-firebase deploy --only hosting
+# 4. Deploy en orden seguro:
+#    a) Indexes primero (esperar 5-15min "Built")
+firebase deploy --only firestore:indexes
+
+#    b) Hosting + Functions
+firebase deploy --only hosting,functions
+
+#    c) Rules (último, después de app desplegada con nuevo schema)
+firebase deploy --only firestore:rules
 
 # 5. Commit + push
-git add .
+git add app functions firestore.rules firestore.indexes.json firestore-tests MANUAL_SETUP.md
 git commit -m "feat: <descripción>"
 git push
 ```
@@ -313,22 +393,23 @@ git push
 
 ## Pendientes principales
 
-Ver lista completa en [`tasks/pendientes.md`](./tasks/pendientes.md).
+Detalles completos en [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) y [`tasks/pendientes.md`](./tasks/pendientes.md).
 
-**Críticos para release Android:**
-- [ ] Cuenta Google Play Console (USD 25 una vez).
-- [ ] EAS build production AAB.
-- [ ] Reemplazar AdMob test IDs por los reales.
-- [ ] Maps SDK Android API key en `app/app.json`.
-- [ ] Icono + splash definitivos en `app/assets/`.
+**Críticos para producción real:**
+- [ ] **TiloPay**: generar API keys + webhook secret, configurar en Functions secrets, confirmar payload con soporte. Hoy modo stub.
+- [ ] **Google Play Console**: USD 25 fee + applicationId `com.cambiafiguritas.app` + producto IAP `cf_premium_lifetime` USD 2.99 + service account para `verifyPlayPurchase`.
+- [ ] **EAS dev build**: instalar `react-native-iap` + build interno para probar Play Billing real.
+- [ ] **AdMob real**: reemplazar test IDs por banners + rewarded + interstitial reales + UMP consent (Europa/GDPR).
+- [ ] **Maps SDK Android API key** en `app/app.json`.
+- [ ] **Borrar cuenta** (requerido por Google Play).
 
 **Mejoras detectadas:**
-- [ ] UI editar perfil (city, whatsapp).
-- [ ] DatePicker en CreateEventModal.
-- [ ] Filtro de eventos por distancia.
-- [ ] Toast/banner de errores global.
-- [ ] Borrar cuenta (requerido por Google Play).
-- [ ] UMP consent form (Europa/GDPR).
+- [ ] DatePicker en CreateEventModal (hoy texto manual).
+- [ ] Backfill citySlug en eventos legacy (Cloud Function admin).
+- [ ] RTDN Pub/Sub para refunds Play Billing → revoke premium.
+- [ ] Geohash server-side queries cuando >5k events o >10k users.
+- [ ] iOS App Store (post-Android).
+- [ ] Dominio propio + AdSense.
 
 ---
 

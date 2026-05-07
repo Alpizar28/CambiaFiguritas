@@ -19,9 +19,12 @@ import { ContextMenu } from './components/ContextMenu';
 import { RepeatCounterMenu } from './components/RepeatCounterMenu';
 import { ConnectedStickerCard } from './components/ConnectedStickerCard';
 import { StickerActionSheet } from './components/StickerActionSheet';
-import { countryStickerGroups, specialStickerGroup } from './data/albumCatalog';
+import { allStickers, countryStickerGroups, specialStickerGroup } from './data/albumCatalog';
 import { haptic } from '../../utils/haptics';
+import { track } from '../../services/analytics';
+import { Tooltip } from '../../components/Tooltip';
 import type { AlbumSlot, CountryAlbumPage, Sticker, StickerStatus } from './types';
+import { fuzzyContains } from './utils/fuzzyMatch';
 
 type AlbumFilter = 'all' | StickerStatus;
 
@@ -35,14 +38,52 @@ const filters: Array<{ label: string; value: AlbumFilter }> = [
 
 const stickerGroups = countryStickerGroups.concat(specialStickerGroup);
 
-const matchesQuery = (sticker: Sticker, normalizedQuery: string) =>
-  normalizedQuery.length === 0 ||
-  sticker.countryName?.toLowerCase().includes(normalizedQuery) ||
-  sticker.group?.toLowerCase().includes(normalizedQuery) ||
-  sticker.displayCode.toLowerCase().includes(normalizedQuery) ||
-  sticker.label.toLowerCase().includes(normalizedQuery) ||
-  sticker.kind.toLowerCase().includes(normalizedQuery) ||
-  String(sticker.slotNumber).includes(normalizedQuery);
+const stickersByCode: Map<string, { sticker: Sticker; groupIndex: number }> = new Map();
+stickerGroups.forEach((group, groupIndex) => {
+  group.stickers.forEach((sticker) => {
+    stickersByCode.set(sticker.displayCode.toLowerCase(), { sticker, groupIndex });
+  });
+});
+
+// Detecta búsqueda por código directo: "ARG12", "FW1", "12 argentina", "argentina 12"
+function parseDirectCode(rawQuery: string): { sticker: Sticker; groupIndex: number } | null {
+  const q = rawQuery.trim().toLowerCase();
+  if (q.length < 2) return null;
+  const direct = stickersByCode.get(q);
+  if (direct) return direct;
+  // "12 argentina" o "argentina 12": split en palabras + número
+  const numMatch = q.match(/^(.+?)\s+(\d{1,3})$|^(\d{1,3})\s+(.+)$/);
+  if (!numMatch) return null;
+  const word = (numMatch[1] || numMatch[4] || '').trim();
+  const num = numMatch[2] || numMatch[3];
+  if (!word || !num) return null;
+  const groupIdx = stickerGroups.findIndex(
+    (g) =>
+      g.country.name.toLowerCase().includes(word) ||
+      g.country.code.toLowerCase() === word.toLowerCase(),
+  );
+  if (groupIdx < 0) return null;
+  const group = stickerGroups[groupIdx];
+  const numInt = parseInt(num, 10);
+  const sticker = group.stickers.find((s) => s.slotNumber === numInt);
+  if (!sticker) return null;
+  return { sticker, groupIndex: groupIdx };
+}
+
+const matchesQuery = (sticker: Sticker, normalizedQuery: string) => {
+  if (normalizedQuery.length === 0) return true;
+  const fields = [
+    sticker.countryName ?? '',
+    sticker.group ?? '',
+    sticker.displayCode,
+    sticker.label,
+    sticker.kind,
+  ];
+  for (const f of fields) {
+    if (fuzzyContains(f.toLowerCase(), normalizedQuery)) return true;
+  }
+  return String(sticker.slotNumber).includes(normalizedQuery);
+};
 
 const getGroupStats = (stickers: Sticker[], statuses: Record<string, StickerStatus>) => {
   const owned = stickers.filter((sticker) => {
@@ -65,6 +106,7 @@ export function AlbumScreen() {
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<AlbumFilter>('all');
+  const [highlightedStickerId, setHighlightedStickerId] = useState<string | null>(null);
 
   // Para desktop (menú flotante)
   const [menuState, setMenuState] = useState<{
@@ -93,6 +135,15 @@ export function AlbumScreen() {
   const normalizedQuery = query.trim().toLowerCase();
   const isSpecials = activeGroup.country.id === 'especiales';
 
+  // Si query matchea metadata del país activo (nombre/código/grupo),
+  // mostrar todas las figuritas del país en vez de filtrar individualmente.
+  const queryMatchesCountryMeta =
+    normalizedQuery.length >= 2 &&
+    (activeGroup.country.name.toLowerCase().includes(normalizedQuery) ||
+      activeGroup.country.code.toLowerCase().includes(normalizedQuery) ||
+      !!activeGroup.country.group?.toLowerCase().includes(normalizedQuery));
+  const effectiveQuery = queryMatchesCountryMeta ? '' : normalizedQuery;
+
   const stickersById = useMemo(
     () =>
       activeGroup.stickers.reduce<Record<string, Sticker>>((acc, sticker) => {
@@ -107,9 +158,9 @@ export function AlbumScreen() {
       activeGroup.stickers.filter((sticker) => {
         const status = statuses[sticker.id] ?? 'missing';
         const matchesFilter = activeFilter === 'all' || status === activeFilter;
-        return matchesFilter && matchesQuery(sticker, normalizedQuery);
+        return matchesFilter && matchesQuery(sticker, effectiveQuery);
       }),
-    [activeGroup, statuses, activeFilter, normalizedQuery],
+    [activeGroup, statuses, activeFilter, effectiveQuery],
   );
 
   // Auto-scroll al país activo
@@ -120,9 +171,31 @@ export function AlbumScreen() {
     });
   }, [activeGroupIndex, width]);
 
-  // Auto-saltar al primer país que matchea cuando hay query
+  // Búsqueda directa por código: "ARG12", "FW1", "12 argentina"
+  // Si hay match exacto: salta al país + highlight 2.5s
+  useEffect(() => {
+    const direct = parseDirectCode(normalizedQuery);
+    if (!direct) {
+      setHighlightedStickerId(null);
+      return;
+    }
+    if (direct.groupIndex !== activeGroupIndex) {
+      setActiveGroupIndex(direct.groupIndex);
+    }
+    setActiveFilter('all');
+    setHighlightedStickerId(direct.sticker.id);
+    track({
+      name: 'sticker_searched_by_code',
+      params: { code: direct.sticker.displayCode, matched: true },
+    });
+    const timer = setTimeout(() => setHighlightedStickerId(null), 2500);
+    return () => clearTimeout(timer);
+  }, [normalizedQuery]);
+
+  // Auto-saltar al primer país que matchea cuando hay query (fallback no-código)
   useEffect(() => {
     if (normalizedQuery.length < 2) return;
+    if (parseDirectCode(normalizedQuery)) return; // direct code maneja jump
     if (activeGroup.stickers.some((s) => matchesQuery(s, normalizedQuery))) return;
     const matchIndex = stickerGroups.findIndex((g) =>
       g.country.name.toLowerCase().includes(normalizedQuery) ||
@@ -197,7 +270,7 @@ export function AlbumScreen() {
   const shouldShowSticker = (sticker: Sticker) => {
     const status = statuses[sticker.id] ?? 'missing';
     const matchesFilter = activeFilter === 'all' || status === activeFilter;
-    return matchesFilter && matchesQuery(sticker, normalizedQuery);
+    return matchesFilter && matchesQuery(sticker, effectiveQuery);
   };
 
   const renderSlot = (slot: AlbumSlot, index: number) => {
@@ -228,6 +301,7 @@ export function AlbumScreen() {
         key={sticker.id}
         sticker={sticker}
         colSpan={slot.colSpan}
+        highlighted={highlightedStickerId === sticker.id}
         onLongPress={handleLongPress}
       />
     );
@@ -253,6 +327,12 @@ export function AlbumScreen() {
     const pageWidth = undefined; // móvil: ancho natural 100%
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
+        <Tooltip
+          id="album-search"
+          title="🔎 Buscá rápido"
+          message="Escribí 'ARG12' o 'argentina 12' para saltar directo a esa figurita."
+          position="top"
+        />
         {/* Header compacto sticky */}
         <View style={styles.mobileHeader}>
           <View style={styles.mobileTitleRow}>
@@ -418,6 +498,7 @@ export function AlbumScreen() {
                   <ConnectedStickerCard
                     key={sticker.id}
                     sticker={sticker}
+                    highlighted={highlightedStickerId === sticker.id}
                     onLongPress={handleLongPress}
                   />
                 ))}
@@ -448,6 +529,12 @@ export function AlbumScreen() {
   const desktopPageWidth = (desktopContentWidth - spacing.sm * 3) / 2;
   return (
     <View style={styles.screen}>
+      <Tooltip
+        id="album-search"
+        title="🔎 Buscá rápido"
+        message="Escribí 'ARG12' o 'argentina 12' para saltar directo a esa figurita."
+        position="top"
+      />
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.workspace}>
           <View style={styles.toolbar}>
@@ -464,8 +551,8 @@ export function AlbumScreen() {
             </View>
           </View>
 
-          <View style={styles.controlsRow}>
-            <View style={{ position: 'relative', flexBasis: 320 }}>
+          <View style={[styles.controlsRow, { zIndex: 100 }]}>
+            <View style={{ position: 'relative', flexBasis: 320, zIndex: 100 }}>
               <View style={styles.searchCard}>
                 <TextInput
                   autoCapitalize="none"
@@ -571,6 +658,7 @@ export function AlbumScreen() {
                   <ConnectedStickerCard
                     key={sticker.id}
                     sticker={sticker}
+                    highlighted={highlightedStickerId === sticker.id}
                     onLongPress={handleLongPress}
                   />
                 ))}
@@ -703,12 +791,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     marginHorizontal: 0,
-    zIndex: 50,
+    zIndex: 1000,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 8,
+    elevation: 1000,
   },
   suggestionRow: {
     flexDirection: 'row',
@@ -881,6 +969,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.xs,
     marginBottom: spacing.md,
+    zIndex: 1,
   },
   countryNavButton: {
     alignItems: 'center',
@@ -970,6 +1059,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignSelf: 'stretch',
     position: 'relative',
+    zIndex: 1,
     gap: spacing.sm,
     padding: spacing.sm,
     backgroundColor: '#3D2817',

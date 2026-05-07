@@ -13,6 +13,7 @@ import { makeRedirectUri } from 'expo-auth-session';
 import { GoogleAuthProvider, signInWithPopup, signInWithCredential } from 'firebase/auth';
 import { auth } from '../../services/firebase';
 import { useUserStore } from '../../store/userStore';
+import { track } from '../../services/analytics';
 import { colors, spacing, radii } from '../../constants/theme';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -26,6 +27,12 @@ export function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
   const setUser = useUserStore((s) => s.setUser);
   const setLoading = useUserStore((s) => s.setLoading);
+  const enterDemo = useUserStore((s) => s.enterDemo);
+
+  const handleDemoEntry = () => {
+    track({ name: 'demo_entered' });
+    enterDemo();
+  };
 
   const handleDevLogin = () => {
     setLoading(false);
@@ -120,6 +127,9 @@ export function LoginScreen() {
             <Text style={styles.buttonText}>Continuar con Google</Text>
           )}
         </TouchableOpacity>
+        <TouchableOpacity style={styles.demoButton} onPress={handleDemoEntry}>
+          <Text style={styles.demoButtonText}>Ver el álbum sin cuenta →</Text>
+        </TouchableOpacity>
         {__DEV__ && (
           <TouchableOpacity style={styles.devButton} onPress={handleDevLogin}>
             <Text style={styles.devButtonText}>⚙ Entrar sin login (DEV)</Text>
@@ -181,6 +191,15 @@ const styles = StyleSheet.create({
     color: colors.danger,
     fontSize: 14,
     textAlign: 'center',
+  },
+  demoButton: {
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  demoButtonText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
   devButton: {
     borderColor: '#444',

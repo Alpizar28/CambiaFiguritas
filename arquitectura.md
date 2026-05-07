@@ -1,13 +1,15 @@
 # Arquitectura — App de Figuritas Mundial
 
+> **Estado actual (2026-05):** MVP completo + Sprint A (digest, perfect trade, verified, stats, fuzzy, OG) + Sprint B (premium cross-platform TiloPay+Play Billing, match cap, rewarded ads) + Sprint C (eventos por zona) + Sprint D (matches Tinder-style + historial). Web live en https://cambiafiguritas.web.app. Android pendiente EAS dev build + Play Console.
+
 ## Objetivo
 
 Aplicación multiplataforma para:
 - llevar control del álbum del mundial
 - registrar figuritas repetidas/faltantes
-- encontrar matches de intercambio
-- descubrir eventos cercanos
-- monetizar con anuncios ligeros
+- encontrar matches de intercambio (Tinder-style top 5/10)
+- descubrir eventos cercanos (filtro estricto por zona)
+- monetizar con premium one-time (USD 2.99) + anuncios ligeros
 
 Enfoque:
 - UX extremadamente rápida
@@ -22,17 +24,21 @@ Enfoque:
 
 | Capa | Tecnología |
 |---|---|
-| Frontend | React Native |
-| Framework | Expo |
+| Frontend | React Native + Expo SDK 54 |
 | Lenguaje | TypeScript |
-| Estado global | Zustand |
+| Estado global | Zustand (+ persist AsyncStorage) |
 | Backend | Firebase |
-| Database | Firestore |
-| Auth | Firebase Auth |
-| Hosting Web | Firebase Hosting |
-| Analytics | Firebase Analytics |
+| Database | Firestore (con subcollections + composite indexes) |
+| Cloud Functions | Node 20 v2 (callable + HTTPS + scheduled) |
+| Auth | Firebase Auth (Google OAuth) |
+| Hosting Web | Firebase Hosting + PWA service worker |
+| Analytics | Firebase Analytics (~60 eventos tipados) |
+| Push | Firebase Cloud Messaging (FCM) |
+| Pagos web | TiloPay (USD checkout redirect) |
+| Pagos Android | Google Play Billing (one-time IAP) |
 | Ads | Google AdMob |
-| Mapas | Google Maps |
+| Mapas | react-native-maps (native) + Leaflet/OSM (web) |
+| Errores | Sentry (web + native, sourcemaps) |
 | OCR futuro | VPS propio |
 
 ---

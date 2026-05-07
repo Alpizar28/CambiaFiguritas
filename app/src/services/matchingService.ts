@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, limit, query, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, query } from 'firebase/firestore';
 import { db } from './firebase';
 import { allStickers } from '../features/album/data/albumCatalog';
 import { haversineKm } from '../utils/distance';
@@ -9,9 +9,16 @@ export type Match = {
   user: AppUser;
   iNeedFromThem: number;
   theyNeedFromMe: number;
+  iNeedIds: string[];
+  theyNeedIds: string[];
+  iNeedPriorityIds: string[];
   score: number;
   distanceKm: number | null;
+  isPerfectTrade: boolean;
 };
+
+const MAX_IDS_PER_SIDE = 60;
+const WISHLIST_BOOST = 3;
 
 type AlbumSnapshot = {
   statuses: Record<string, string>;
@@ -23,33 +30,60 @@ const allIds = allStickers.map((s) => s.id);
 function computeScore(
   myStatuses: StickerStatusMap,
   theirStatuses: Record<string, string>,
-): { iNeedFromThem: number; theyNeedFromMe: number } {
+  myWishlist: Record<string, true>,
+): {
+  iNeedFromThem: number;
+  theyNeedFromMe: number;
+  iNeedIds: string[];
+  theyNeedIds: string[];
+  iNeedPriorityIds: string[];
+  weightedScore: number;
+} {
   const myMissing = new Set(allIds.filter((id) => (myStatuses[id] ?? 'missing') === 'missing'));
   const myRepeated = new Set(Object.entries(myStatuses).filter(([, s]) => s === 'repeated').map(([id]) => id));
   const theirRepeated = new Set(Object.entries(theirStatuses).filter(([, s]) => s === 'repeated').map(([id]) => id));
   const theirMissing = new Set(allIds.filter((id) => (theirStatuses[id] ?? 'missing') === 'missing'));
 
-  let iNeedFromThem = 0;
-  theirRepeated.forEach((id) => { if (myMissing.has(id)) iNeedFromThem++; });
+  const iNeedIds: string[] = [];
+  const iNeedPriorityIds: string[] = [];
+  theirRepeated.forEach((id) => {
+    if (myMissing.has(id)) {
+      iNeedIds.push(id);
+      if (myWishlist[id]) iNeedPriorityIds.push(id);
+    }
+  });
+  // Wishlisted items first dentro de iNeedIds para mejor visualización del top.
+  iNeedIds.sort((a, b) => Number(Boolean(myWishlist[b])) - Number(Boolean(myWishlist[a])));
 
-  let theyNeedFromMe = 0;
-  myRepeated.forEach((id) => { if (theirMissing.has(id)) theyNeedFromMe++; });
+  const theyNeedIds: string[] = [];
+  myRepeated.forEach((id) => { if (theirMissing.has(id)) theyNeedIds.push(id); });
 
-  return { iNeedFromThem, theyNeedFromMe };
+  const weightedScore = iNeedIds.length + theyNeedIds.length + iNeedPriorityIds.length * (WISHLIST_BOOST - 1);
+
+  return {
+    iNeedFromThem: iNeedIds.length,
+    theyNeedFromMe: theyNeedIds.length,
+    iNeedIds: iNeedIds.slice(0, MAX_IDS_PER_SIDE),
+    theyNeedIds: theyNeedIds.slice(0, MAX_IDS_PER_SIDE),
+    iNeedPriorityIds: iNeedPriorityIds.slice(0, MAX_IDS_PER_SIDE),
+    weightedScore,
+  };
 }
 
-export async function saveUserLocation(uid: string, lat: number, lng: number): Promise<void> {
-  await updateDoc(doc(db, 'users', uid), { lat, lng });
-}
+export { saveUserLocation } from './userService';
+
+const POOL_LIMIT = 200;
 
 export async function findMatches(
   currentUid: string,
   myStatuses: StickerStatusMap,
+  myWishlist: Record<string, true> = {},
   myLat?: number,
   myLng?: number,
+  _isPremium: boolean = false,
 ): Promise<Match[]> {
   const albumsRef = collection(db, 'userAlbums');
-  const snap = await getDocs(query(albumsRef, limit(50)));
+  const snap = await getDocs(query(albumsRef, limit(POOL_LIMIT)));
 
   const candidates: { uid: string; statuses: Record<string, string> }[] = [];
   snap.forEach((d) => {
@@ -60,11 +94,21 @@ export async function findMatches(
 
   const scored = candidates
     .map(({ uid, statuses }) => {
-      const { iNeedFromThem, theyNeedFromMe } = computeScore(myStatuses, statuses);
-      return { uid, iNeedFromThem, theyNeedFromMe, score: iNeedFromThem + theyNeedFromMe };
+      const { iNeedFromThem, theyNeedFromMe, iNeedIds, theyNeedIds, iNeedPriorityIds, weightedScore } =
+        computeScore(myStatuses, statuses, myWishlist);
+      return {
+        uid,
+        iNeedFromThem,
+        theyNeedFromMe,
+        iNeedIds,
+        theyNeedIds,
+        iNeedPriorityIds,
+        rawScore: iNeedFromThem + theyNeedFromMe,
+        weightedScore,
+      };
     })
-    .filter((m) => m.score > 0)
-    .slice(0, 20);
+    .filter((m) => m.rawScore > 0)
+    .sort((a, b) => b.weightedScore - a.weightedScore);
 
   if (scored.length === 0) return [];
 
@@ -81,12 +125,20 @@ export async function findMatches(
       myLat != null && myLng != null && user.lat != null && user.lng != null
         ? haversineKm(myLat, myLng, user.lat, user.lng)
         : null;
+    const isPerfectTrade =
+      m.iNeedFromThem > 0 &&
+      m.theyNeedFromMe > 0 &&
+      Math.abs(m.iNeedFromThem - m.theyNeedFromMe) <= 2;
     matches.push({
       user,
       iNeedFromThem: m.iNeedFromThem,
       theyNeedFromMe: m.theyNeedFromMe,
-      score: m.score,
+      iNeedIds: m.iNeedIds,
+      theyNeedIds: m.theyNeedIds,
+      iNeedPriorityIds: m.iNeedPriorityIds,
+      score: m.weightedScore,
       distanceKm,
+      isPerfectTrade,
     });
   });
 

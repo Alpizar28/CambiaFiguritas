@@ -10,6 +10,8 @@ type StickerCardProps = {
   status: StickerStatus;
   repeatedCount?: number;
   colSpan?: 1 | 2;
+  highlighted?: boolean;
+  wishlisted?: boolean;
   onPress: () => void;
   onDoublePress: () => void;
   onLongPress: (event: { nativeEvent: { pageX: number; pageY: number } }) => void;
@@ -29,6 +31,8 @@ function StickerCardImpl({
   status,
   repeatedCount = 0,
   colSpan = 1,
+  highlighted = false,
+  wishlisted = false,
   onPress,
   onDoublePress,
   onLongPress,
@@ -79,6 +83,7 @@ function StickerCardImpl({
           : styles.singleCard,
         variantStyle,
         pressed && styles.pressed,
+        highlighted && styles.highlighted,
       ]}
     >
       <View style={styles.topRow}>
@@ -95,6 +100,12 @@ function StickerCardImpl({
       <Text numberOfLines={1} style={[styles.label, status === 'missing' && styles.labelMissing]}>
         {sticker.label}
       </Text>
+
+      {wishlisted && (
+        <View style={styles.wishlistBadge} pointerEvents="none">
+          <Text style={styles.wishlistBadgeIcon}>★</Text>
+        </View>
+      )}
 
       {isSpecial && <View style={styles.specialShine} pointerEvents="none" />}
 
@@ -144,6 +155,39 @@ const styles = StyleSheet.create({
   singleCard: { flexBasis: '23.5%' },
   singleCardMobile: { flexBasis: '31%', minHeight: 90 },
   doubleCard: { flexBasis: '49%' },
+
+  highlighted: {
+    borderColor: '#FFD700',
+    borderWidth: 3,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 12,
+    elevation: 8,
+    transform: [{ scale: 1.04 }],
+  },
+  wishlistBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FFD700',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  wishlistBadgeIcon: {
+    color: '#0A0A0A',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 14,
+  },
 
   // ---- Variant: MISSING (slot vacío con dashed) ----
   missing: {
