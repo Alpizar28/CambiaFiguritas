@@ -17,6 +17,8 @@ import { updateUser } from '../../services/userService';
 import { useUserStore } from '../../store/userStore';
 import { useAlbumStore } from '../../store/albumStore';
 import { useOnboardingStore } from '../../store/onboardingStore';
+import { shareText } from '../../utils/share';
+import { track } from '../../services/analytics';
 import { colors, spacing, radii } from '../../constants/theme';
 
 export function ProfileScreen() {
@@ -33,6 +35,19 @@ export function ProfileScreen() {
   const [saved, setSaved] = useState(false);
 
   const handleLogout = () => signOut(auth);
+
+  const handleShare = async () => {
+    const stats = `${owned}/${total} figuritas (${repeated} repes)`;
+    const message = `Estoy completando el album del Mundial 2026: ${stats}. Sumate a CambiaFiguritas para encontrar matches e intercambiar:`;
+    const url = 'https://cambiafiguritas.web.app';
+    const result = await shareText(message, url);
+    track({ name: 'share_album_clicked', params: { stats } });
+    if (result === 'copied') {
+      Alert.alert('Copiado', 'Link copiado al portapapeles.');
+    } else if (result === 'error') {
+      Alert.alert('Error', 'No se pudo compartir. Intentá de nuevo.');
+    }
+  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -120,6 +135,10 @@ export function ProfileScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+        <Text style={styles.shareButtonText}>📤 Compartir mi progreso</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.tutorialButton} onPress={resetOnboarding}>
         <Text style={styles.tutorialText}>Ver tutorial otra vez</Text>
@@ -255,13 +274,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 15,
   },
+  shareButton: {
+    backgroundColor: colors.accent,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  shareButtonText: {
+    color: colors.background,
+    fontWeight: '700',
+    fontSize: 15,
+  },
   tutorialButton: {
     borderColor: colors.border,
     borderWidth: 1,
     borderRadius: radii.md,
     padding: spacing.md,
     alignItems: 'center',
-    marginTop: spacing.lg,
+    marginTop: spacing.sm,
   },
   tutorialText: {
     color: colors.textMuted,

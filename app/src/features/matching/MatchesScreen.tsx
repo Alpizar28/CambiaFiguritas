@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { useAlbumStore } from '../../store/albumStore';
 import { useMatchStore } from '../../store/matchStore';
 import { findMatches, saveUserLocation } from '../../services/matchingService';
 import { track } from '../../services/analytics';
+import { Pressable } from 'react-native';
 import { MatchCard } from './components/MatchCard';
 import { AdBanner } from '../../components/AdBanner';
 import { MatchCardSkeleton } from '../../components/Skeleton';
@@ -27,6 +28,24 @@ export function MatchesScreen() {
   const statuses = useAlbumStore((s) => s.statuses);
   const { matches, loading, error, lastFetched, setMatches, setLoading, setError } = useMatchStore();
   const coordsRef = useRef<{ lat: number; lng: number } | null>(null);
+
+  type MatchFilter = 'all' | 'nearby' | 'high_score';
+  const [filter, setFilter] = useState<MatchFilter>('all');
+
+  const filteredMatches = useMemo(() => {
+    if (filter === 'nearby') {
+      return matches.filter((m) => m.distanceKm != null && m.distanceKm <= 50);
+    }
+    if (filter === 'high_score') {
+      return matches.filter((m) => m.score >= 5);
+    }
+    return matches;
+  }, [matches, filter]);
+
+  const handleFilterChange = (newFilter: MatchFilter) => {
+    setFilter(newFilter);
+    track({ name: 'matches_filter_changed', params: { filter: newFilter } });
+  };
 
   const getLocation = useCallback(async (): Promise<{ lat: number; lng: number } | null> => {
     if (coordsRef.current) return coordsRef.current;
@@ -95,19 +114,39 @@ export function MatchesScreen() {
         </View>
       ) : (
         <FlatList
-          data={matches}
+          data={filteredMatches}
           keyExtractor={(m) => m.user.uid}
           renderItem={({ item }) => <MatchCard match={item} />}
           contentContainerStyle={styles.list}
           ListHeaderComponent={
             lastFetched ? (
-              <View style={styles.listHeader}>
-                <Text style={styles.resultCount}>
-                  {matches.length} {matches.length === 1 ? 'match' : 'matches'} encontrados
-                </Text>
-                <TouchableOpacity onPress={refresh} disabled={loading}>
-                  <Text style={styles.refreshText}>{loading ? 'Buscando...' : 'Actualizar'}</Text>
-                </TouchableOpacity>
+              <View>
+                <View style={styles.listHeader}>
+                  <Text style={styles.resultCount}>
+                    {filteredMatches.length} {filteredMatches.length === 1 ? 'match' : 'matches'}
+                    {filter !== 'all' && ` (de ${matches.length})`}
+                  </Text>
+                  <TouchableOpacity onPress={refresh} disabled={loading}>
+                    <Text style={styles.refreshText}>{loading ? 'Buscando...' : 'Actualizar'}</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.filterRow}>
+                  {([
+                    { v: 'all' as const, label: 'Todos' },
+                    { v: 'nearby' as const, label: 'Cerca (<50km)' },
+                    { v: 'high_score' as const, label: 'Mejor match' },
+                  ]).map((f) => (
+                    <Pressable
+                      key={f.v}
+                      onPress={() => handleFilterChange(f.v)}
+                      style={[styles.filterChip, filter === f.v && styles.filterChipActive]}
+                    >
+                      <Text style={[styles.filterChipText, filter === f.v && styles.filterChipTextActive]}>
+                        {f.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
             ) : null
           }
@@ -127,7 +166,7 @@ export function MatchesScreen() {
               />
             ) : null
           }
-          ListFooterComponent={matches.length > 0 ? <AdBanner inline /> : null}
+          ListFooterComponent={filteredMatches.length > 0 ? <AdBanner inline /> : null}
         />
       )}
     </View>
@@ -184,6 +223,32 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 13,
     fontWeight: '600',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+    flexWrap: 'wrap',
+  },
+  filterChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  filterChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  filterChipText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  filterChipTextActive: {
+    color: colors.background,
   },
   center: {
     flex: 1,

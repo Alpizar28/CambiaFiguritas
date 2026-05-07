@@ -21,7 +21,9 @@ type AnalyticsEvent =
   | { name: 'screen_view'; params: { screen: string } }
   | { name: 'onboarding_started' }
   | { name: 'onboarding_skipped'; params: { atSlide: number } }
-  | { name: 'onboarding_completed' };
+  | { name: 'onboarding_completed' }
+  | { name: 'share_album_clicked'; params: { stats: string } }
+  | { name: 'matches_filter_changed'; params: { filter: string } };
 
 let analyticsInstance: Analytics | null = null;
 let initPromise: Promise<Analytics | null> | null = null;
