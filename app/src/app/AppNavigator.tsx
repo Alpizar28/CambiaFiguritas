@@ -66,6 +66,8 @@ export function AppNavigator() {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
             paddingTop: 6,
+            paddingBottom: 8,
+            height: 62,
           },
           tabBarIcon: ({ focused }) => {
             const Icon = TAB_ICONS[route.name];

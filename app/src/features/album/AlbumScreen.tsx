@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
-  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -79,7 +78,7 @@ export function AlbumScreen() {
   const [sheetStickerId, setSheetStickerId] = useState<string | null>(null);
 
   const countryScrollerRef = useRef<ScrollView>(null);
-  const pagerRef = useRef<FlatList<CountryAlbumPage>>(null);
+  const pagerRef = useRef<ScrollView>(null);
 
   const statuses = useAlbumStore((state) => state.statuses);
   const repeatedCounts = useAlbumStore((state) => state.repeatedCounts);
@@ -124,7 +123,7 @@ export function AlbumScreen() {
   // Reset page al cambiar de país
   useEffect(() => {
     setActiveCountryPage(1);
-    pagerRef.current?.scrollToOffset({ offset: 0, animated: false });
+    pagerRef.current?.scrollTo({ x: 0, animated: false });
   }, [activeGroupIndex]);
 
   const moveCountry = (direction: -1 | 1) => {
@@ -205,7 +204,7 @@ export function AlbumScreen() {
   const renderAlbumPage = (page: CountryAlbumPage, pageWidth?: number) => (
     <View
       key={page.pageInCountry}
-      style={[styles.albumPage, pageWidth != null && { width: pageWidth }]}
+      style={[styles.albumPage, pageWidth != null ? { width: pageWidth } : { alignSelf: 'stretch' }]}
     >
       <View style={styles.pageTopline}>
         <Text style={styles.pageLabel}>Pagina {page.pageInCountry}</Text>
@@ -219,7 +218,7 @@ export function AlbumScreen() {
 
   // ----- MOBILE LAYOUT -----
   if (!isDesktop) {
-    const pageWidth = width - spacing.md * 2 - 6; // padding interno del spread
+    const pageWidth = undefined; // móvil: ancho natural 100%
     return (
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         {/* Header compacto sticky */}
@@ -250,7 +249,10 @@ export function AlbumScreen() {
             </Text>
           </View>
 
-          <AlbumProgress {...stats} />
+          {/* Barra de progreso compacta inline */}
+          <View style={styles.mobileProgressBar}>
+            <View style={[styles.mobileProgressFill, { width: `${stats.progress}%` as any }]} />
+          </View>
 
           {searchOpen && (
             <View style={styles.searchCardMobile}>
@@ -339,10 +341,14 @@ export function AlbumScreen() {
           </View>
         </View>
 
-        {/* Páginas con swipe horizontal */}
-        <View style={[styles.spread, { paddingBottom: insets.bottom + 90 }]}>
+        {/* Páginas — scroll vertical, una debajo de la otra */}
+        <ScrollView
+          style={styles.mobileScroll}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 120, gap: spacing.sm }}
+          showsVerticalScrollIndicator={false}
+        >
           {isSpecials ? (
-            <ScrollView contentContainerStyle={styles.specialPanel}>
+            <View style={styles.mobilePage}>
               <View style={styles.originalGrid}>
                 {visibleStickers.map((sticker) => (
                   <ConnectedStickerCard
@@ -352,40 +358,11 @@ export function AlbumScreen() {
                   />
                 ))}
               </View>
-            </ScrollView>
+            </View>
           ) : (
-            <>
-              <FlatList
-                ref={pagerRef}
-                data={activeGroup.pages}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                keyExtractor={(p) => String(p.pageInCountry)}
-                renderItem={({ item }) => (
-                  <ScrollView contentContainerStyle={{ paddingBottom: spacing.lg }}>
-                    {renderAlbumPage(item, pageWidth)}
-                  </ScrollView>
-                )}
-                onMomentumScrollEnd={(e) => {
-                  const page = Math.round(e.nativeEvent.contentOffset.x / pageWidth) + 1;
-                  setActiveCountryPage(page as 1 | 2);
-                }}
-                getItemLayout={(_, index) => ({ length: pageWidth, offset: pageWidth * index, index })}
-                snapToInterval={pageWidth}
-                decelerationRate="fast"
-              />
-              <View style={styles.pageDots}>
-                {[1, 2].map((p) => (
-                  <View
-                    key={p}
-                    style={[styles.pageDot, activeCountryPage === p && styles.pageDotActive]}
-                  />
-                ))}
-              </View>
-            </>
+            activeGroup.pages.map((item) => renderAlbumPage(item, pageWidth))
           )}
-        </View>
+        </ScrollView>
 
         <StickerActionSheet
           visible={!!sheetSticker}
@@ -401,8 +378,10 @@ export function AlbumScreen() {
     );
   }
 
-  // ----- DESKTOP LAYOUT (existente) -----
+  // ----- DESKTOP LAYOUT -----
   const pagesToRender = activeGroup.pages;
+  const desktopContentWidth = Math.min(width, 1220) - spacing.lg * 2;
+  const desktopPageWidth = (desktopContentWidth - spacing.sm * 3) / 2;
   return (
     <View style={styles.screen}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -510,8 +489,8 @@ export function AlbumScreen() {
               </View>
             </View>
           ) : (
-            <View style={[styles.spread, styles.desktopSpread]}>
-              {pagesToRender.map((p) => renderAlbumPage(p))}
+            <View style={styles.desktopSpread}>
+              {pagesToRender.map((p) => renderAlbumPage(p, desktopPageWidth))}
               <View pointerEvents="none" style={styles.bookFold} />
             </View>
           )}
@@ -548,27 +527,28 @@ const styles = StyleSheet.create({
 
   // ----- MOBILE -----
   mobileHeader: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
     backgroundColor: '#0A0A0A',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   mobileTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
   mobileKicker: {
     color: '#FFD600',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
+    marginBottom: 2,
   },
   mobileTitle: {
     color: '#FFFFFF',
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
@@ -577,10 +557,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
   mobileStatsText: {
     color: '#B0B0B0',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     flex: 1,
   },
@@ -617,34 +598,45 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
+    marginHorizontal: spacing.md,
   },
   filterScrollerMobile: {
     flexGrow: 0,
+    paddingHorizontal: spacing.md,
   },
   countryNavigatorMobile: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
   countryScrollerContent: {
-    gap: spacing.xs,
+    gap: spacing.sm,
     paddingRight: spacing.sm,
   },
-  pageDots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: spacing.sm,
+  mobileProgressBar: {
+    height: 4,
+    backgroundColor: '#333',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginHorizontal: spacing.md,
   },
-  pageDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#444',
-  },
-  pageDotActive: {
+  mobileProgressFill: {
+    height: 4,
     backgroundColor: '#FFD600',
-    width: 18,
+    borderRadius: 2,
+  },
+  mobileScroll: {
+    flex: 1,
+    paddingHorizontal: spacing.md,
+  },
+  mobilePage: {
+    backgroundColor: '#FAF6E8',
+    borderColor: '#E8DEC2',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
   },
 
   // ----- COMPARTIDO -----
@@ -656,9 +648,9 @@ const styles = StyleSheet.create({
   },
   toolbar: {
     alignItems: 'flex-start',
-    flexDirection: 'column',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.md,
     width: '100%',
   },
   titleBlock: { flex: 1 },
@@ -681,7 +673,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginTop: 2,
   },
-  progressWrap: { width: '100%' },
+  progressWrap: { flex: 1, maxWidth: 480, justifyContent: 'center' },
   controlsRow: {
     alignItems: 'center',
     flexDirection: 'row',
@@ -733,7 +725,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    minHeight: 36,
+    minHeight: 38,
     justifyContent: 'center',
   },
   filterChipActive: {
@@ -742,7 +734,7 @@ const styles = StyleSheet.create({
   },
   filterText: {
     color: '#B0B0B0',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
   },
   filterTextActive: {
@@ -785,8 +777,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     borderWidth: 1,
     minWidth: COUNTRY_BTN_WIDTH,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
   },
   countryButtonActive: {
     backgroundColor: '#FFD600',
@@ -815,28 +807,46 @@ const styles = StyleSheet.create({
     borderColor: '#2A1B0E',
     borderRadius: 20,
     borderWidth: 1,
-    margin: spacing.md,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+    marginTop: spacing.xs,
     padding: spacing.xs,
     shadowColor: '#000',
     shadowOpacity: 0.4,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
+    overflow: 'hidden',
   },
   desktopSpread: {
-    flex: 0,
     flexDirection: 'row',
+    alignSelf: 'stretch',
     position: 'relative',
     gap: spacing.sm,
     padding: spacing.sm,
+    backgroundColor: '#3D2817',
+    borderColor: '#2A1B0E',
+    borderRadius: 20,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
   albumPage: {
     backgroundColor: '#FAF6E8',
     borderColor: '#E8DEC2',
     borderRadius: 16,
     borderWidth: 1,
-    flex: 1,
     padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  desktopPage: {
+    flexBasis: 0,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   pageTopline: {
     alignItems: 'center',

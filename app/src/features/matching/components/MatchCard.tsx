@@ -65,7 +65,9 @@ function Pill({ label, color }: { label: string; color: string }) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: radii.md,
+    borderWidth: 1,
     padding: spacing.md,
     gap: spacing.sm,
   },

@@ -76,7 +76,9 @@ export function EventCard({ event, currentUid, onDelete }: Props) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: radii.md,
+    borderWidth: 1,
     padding: spacing.md,
     gap: spacing.sm,
   },

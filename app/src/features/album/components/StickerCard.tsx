@@ -1,5 +1,5 @@
 import { memo, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { radii, spacing } from '../../../constants/theme';
 import { formatStickerNumber } from '../data/mockAlbum';
@@ -35,6 +35,8 @@ function StickerCardImpl({
   onIncrementRepeated,
   onDecrementRepeated,
 }: StickerCardProps) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 900;
   const hasRepeated = status === 'repeated' || repeatedCount > 0;
   const isSpecial = sticker.rarity === 'special' || status === 'special';
   const pressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,7 +72,11 @@ function StickerCardImpl({
       onLongPress={(event) => onLongPress(event)}
       style={({ pressed }) => [
         styles.card,
-        colSpan === 2 ? styles.doubleCard : styles.singleCard,
+        colSpan === 2
+          ? styles.doubleCard
+          : isMobile
+          ? styles.singleCardMobile
+          : styles.singleCard,
         variantStyle,
         pressed && styles.pressed,
       ]}
@@ -136,6 +142,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   singleCard: { flexBasis: '23.5%' },
+  singleCardMobile: { flexBasis: '31%', minHeight: 90 },
   doubleCard: { flexBasis: '49%' },
 
   // ---- Variant: MISSING (slot vacío con dashed) ----
