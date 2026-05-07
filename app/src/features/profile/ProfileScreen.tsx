@@ -16,6 +16,7 @@ import { auth } from '../../services/firebase';
 import { updateUser } from '../../services/userService';
 import { useUserStore } from '../../store/userStore';
 import { useAlbumStore } from '../../store/albumStore';
+import { useOnboardingStore } from '../../store/onboardingStore';
 import { colors, spacing, radii } from '../../constants/theme';
 
 export function ProfileScreen() {
@@ -23,6 +24,7 @@ export function ProfileScreen() {
   const user = useUserStore((s) => s.user);
   const setUser = useUserStore((s) => s.setUser);
   const getStats = useAlbumStore((s) => s.getStats);
+  const resetOnboarding = useOnboardingStore((s) => s.resetOnboarding);
   const { owned, repeated, missing, total } = getStats();
 
   const [whatsapp, setWhatsapp] = useState(user?.whatsapp ?? '');
@@ -118,6 +120,10 @@ export function ProfileScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity style={styles.tutorialButton} onPress={resetOnboarding}>
+        <Text style={styles.tutorialText}>Ver tutorial otra vez</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutText}>Cerrar sesion</Text>
@@ -249,13 +255,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 15,
   },
+  tutorialButton: {
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  tutorialText: {
+    color: colors.textMuted,
+    fontWeight: '600',
+    fontSize: 14,
+  },
   logoutButton: {
     borderColor: colors.danger,
     borderWidth: 1,
     borderRadius: radii.md,
     padding: spacing.md,
     alignItems: 'center',
-    marginTop: spacing.lg,
+    marginTop: spacing.sm,
   },
   logoutText: {
     color: colors.danger,

@@ -18,7 +18,10 @@ type AnalyticsEvent =
   | { name: 'event_created'; params: { type: string } }
   | { name: 'event_deleted' }
   | { name: 'event_maps_opened' }
-  | { name: 'screen_view'; params: { screen: string } };
+  | { name: 'screen_view'; params: { screen: string } }
+  | { name: 'onboarding_started' }
+  | { name: 'onboarding_skipped'; params: { atSlide: number } }
+  | { name: 'onboarding_completed' };
 
 let analyticsInstance: Analytics | null = null;
 let initPromise: Promise<Analytics | null> | null = null;

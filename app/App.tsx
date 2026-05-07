@@ -12,9 +12,11 @@ import { loadUserAlbum } from './src/services/albumSyncService';
 import { identify, track } from './src/services/analytics';
 import { useUserStore } from './src/store/userStore';
 import { useAlbumStore } from './src/store/albumStore';
+import { useOnboardingStore } from './src/store/onboardingStore';
 import { useAlbumSync } from './src/hooks/useAlbumSync';
 import { AppNavigator } from './src/app/AppNavigator';
 import { LoginScreen } from './src/features/auth/LoginScreen';
+import { OnboardingScreen } from './src/features/onboarding/OnboardingScreen';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { SyncIndicator } from './src/components/SyncIndicator';
 import { colors } from './src/constants/theme';
@@ -34,6 +36,7 @@ export default function App() {
   const loadState = useAlbumStore((s) => s.loadState);
   const resetAlbum = useAlbumStore((s) => s.resetAlbum);
   const hasLocalData = useAlbumStore((s) => s.hasLocalData);
+  const hasCompletedOnboarding = useOnboardingStore((s) => s.hasCompletedOnboarding);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -98,7 +101,11 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        {user ? <AppWithSync /> : <LoginScreen />}
+        {user
+          ? hasCompletedOnboarding
+            ? <AppWithSync />
+            : <OnboardingScreen />
+          : <LoginScreen />}
         <StatusBar style="light" />
       </ErrorBoundary>
     </SafeAreaProvider>
