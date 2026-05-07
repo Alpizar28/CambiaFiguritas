@@ -167,6 +167,9 @@ Reordenado por impacto + dependencias. Foco: web + Android (sin iOS nativo).
 | T4 | Onboarding 4 slides | ✅ Hecho | 5-7h | — | — |
 | T5a | Compartir progreso simple | ✅ Hecho | 1h | — | — |
 | TUX | Filtros UX en Matches | ✅ Hecho | 1h | — | — |
+| TPWA | PWA installable + manifest + SW | ✅ Hecho | 2h | — | — |
+| TStats | Stats breakdown por país en Profile | ✅ Hecho | 1h | — | — |
+| TBadge | Badge país completo en album lista | ✅ Hecho | 0.5h | — | — |
 | T2 | Ícono de la app | ⏳ | 2-4h | T3 | — |
 | T3 | EAS preview Android | ⏳ | 4-8h | Release | T2 |
 | T5 | Compartir álbum link público | ⏳ | 12-16h | — | T1 |
