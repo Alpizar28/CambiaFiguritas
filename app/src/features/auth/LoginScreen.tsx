@@ -78,7 +78,15 @@ export function LoginScreen() {
         // onAuthStateChanged en App.tsx maneja el resto
       } catch (e: any) {
         if (e?.code !== 'auth/popup-closed-by-user') {
-          setError('Error al iniciar sesión. Intentá de nuevo.');
+          const isSafariStorage =
+            e?.message?.includes('missing initial state') ||
+            e?.message?.includes('sessionStorage') ||
+            e?.code === 'auth/web-storage-unsupported';
+          setError(
+            isSafariStorage
+              ? 'Safari bloqueó el login. Desactivá "Prevenir rastreo" en Ajustes > Safari, o usá modo normal (no privado).'
+              : 'Error al iniciar sesión. Intentá de nuevo.',
+          );
         }
         setSigningIn(false);
       }
