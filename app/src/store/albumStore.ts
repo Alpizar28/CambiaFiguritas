@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { allStickers } from '../features/album/data/mockAlbum';
+import { allStickers } from '../features/album/data/albumCatalog';
 import { track } from '../services/analytics';
 import { haptic } from '../utils/haptics';
 import type { StickerStatus, StickerStatusMap } from '../features/album/types';

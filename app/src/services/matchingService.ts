@@ -1,6 +1,6 @@
 import { collection, doc, getDoc, getDocs, limit, query, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
-import { allStickers } from '../features/album/data/mockAlbum';
+import { allStickers } from '../features/album/data/albumCatalog';
 import { haversineKm } from '../utils/distance';
 import type { StickerStatusMap } from '../features/album/types';
 import type { AppUser } from '../types/user';

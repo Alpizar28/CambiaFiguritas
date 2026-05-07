@@ -2,7 +2,7 @@ import { memo, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { radii, spacing } from '../../../constants/theme';
-import { formatStickerNumber } from '../data/mockAlbum';
+import { formatStickerNumber } from '../data/albumCatalog';
 import type { Sticker, StickerStatus } from '../types';
 
 type StickerCardProps = {

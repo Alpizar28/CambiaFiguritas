@@ -19,7 +19,7 @@ import { ContextMenu } from './components/ContextMenu';
 import { RepeatCounterMenu } from './components/RepeatCounterMenu';
 import { ConnectedStickerCard } from './components/ConnectedStickerCard';
 import { StickerActionSheet } from './components/StickerActionSheet';
-import { countryStickerGroups, specialStickerGroup } from './data/mockAlbum';
+import { countryStickerGroups, specialStickerGroup } from './data/albumCatalog';
 import { haptic } from '../../utils/haptics';
 import type { AlbumSlot, CountryAlbumPage, Sticker, StickerStatus } from './types';
 
