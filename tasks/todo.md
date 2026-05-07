@@ -162,11 +162,11 @@ Reordenado por impacto + dependencias. Foco: web + Android (sin iOS nativo).
 | # | Tarea | Estado | Estimación | Bloquea | Bloqueado por |
 |---|-------|--------|------------|---------|---------------|
 | T8 | Splash screen oscuro | ✅ Hecho | — | — | — |
-| T1 | Auditoría Firestore rules | 🔄 Activo | 5-6h | T5, T7 | — |
+| T1 | Auditoría Firestore rules | ✅ Deploy live | 5-6h | T5, T7 | — |
+| T6 | Rename mockAlbum → albumCatalog | ✅ Hecho | 1.5-2h | — | — |
+| T4 | Onboarding 4 slides | ✅ Hecho | 5-7h | — | — |
 | T2 | Ícono de la app | ⏳ | 2-4h | T3 | — |
 | T3 | EAS preview Android | ⏳ | 4-8h | Release | T2 |
-| T6 | Auditoría Matches (no es mock) | ⏳ | 1.5-2h | — | — |
-| T4 | Onboarding | ⏳ | 5-7h | — | — |
 | T5 | Compartir álbum link público | ⏳ | 12-16h | — | T1 |
 | T7 | Push notifications | ⏳ | 14-20h | — | T1, T3 |
 
