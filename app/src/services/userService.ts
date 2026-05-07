@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import type { AppUser } from '../types/user';
 
@@ -27,4 +27,12 @@ export async function getOrCreateUser(
 
   await setDoc(ref, newUser);
   return newUser;
+}
+
+export async function updateUser(
+  uid: string,
+  fields: Partial<Pick<AppUser, 'whatsapp' | 'city'>>,
+): Promise<void> {
+  const ref = doc(db, 'users', uid);
+  await updateDoc(ref, fields);
 }
