@@ -55,6 +55,42 @@ export function ScanScreen({ visible, onClose }: Props) {
   const [streamReady, setStreamReady] = useState(false);
   const [supportsRealtime, setSupportsRealtime] = useState<boolean | null>(null);
 
+  // Mount video element directly to document.body to bypass RN-web wrappers.
+  useEffect(() => {
+    if (!visible) return;
+    if (typeof document === 'undefined') return;
+    const video = document.createElement('video');
+    video.autoplay = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute('playsinline', 'true');
+    video.setAttribute('webkit-playsinline', 'true');
+    Object.assign(video.style, {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '100vw',
+      height: '100vh',
+      objectFit: 'cover',
+      backgroundColor: '#000',
+      zIndex: '9998',
+      pointerEvents: 'none',
+    });
+    document.body.appendChild(video);
+    videoRef.current = video;
+    return () => {
+      video.srcObject = null;
+      video.remove();
+      videoRef.current = null;
+    };
+  }, [visible]);
+
+  // Hide video when reviewing
+  useEffect(() => {
+    if (!videoRef.current) return;
+    videoRef.current.style.display = state.kind === 'review' ? 'none' : 'block';
+  }, [state.kind]);
+
   const stopStream = useCallback(() => {
     if (loopRef.current) {
       window.clearInterval(loopRef.current);
@@ -330,34 +366,14 @@ export function ScanScreen({ visible, onClose }: Props) {
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       onRequestClose={handleClose}
       statusBarTranslucent
+      transparent
     >
       <View style={styles.container}>
-        {/* Live video — always mounted while modal visible. Hidden via display when reviewing. */}
-        {visible ? (
-          <video
-            ref={videoRef as never}
-            autoPlay
-            playsInline
-            muted
-            style={
-              {
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                backgroundColor: '#000',
-                display: isReview ? 'none' : 'block',
-                zIndex: 0,
-              } as never
-            }
-          />
-        ) : null}
-
+        {/* Video element is appended directly to document.body via useEffect.
+            We render only the UI overlay here on top. */}
         {/* Top bar */}
         <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
           <Pressable
@@ -466,7 +482,8 @@ export function ScanScreen({ visible, onClose }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: 'transparent',
+    zIndex: 9999,
   },
   topBar: {
     flexDirection: 'row',
