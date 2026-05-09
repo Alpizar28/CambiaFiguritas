@@ -1,4 +1,4 @@
-import { Platform, Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, radii, spacing } from '../constants/theme';
@@ -10,10 +10,6 @@ type Props = {
 
 export function ScanFab({ onPress, label = 'Escanear' }: Props) {
   const insets = useSafeAreaInsets();
-
-  if (Platform.OS === 'web') {
-    return null;
-  }
 
   return (
     <Pressable

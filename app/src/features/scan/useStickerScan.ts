@@ -1,12 +1,11 @@
 import { useCallback, useRef, useState } from 'react';
-import { Platform } from 'react-native';
 import type { CameraView } from 'expo-camera';
 import * as FileSystem from 'expo-file-system/legacy';
-import TextRecognition from '@react-native-ml-kit/text-recognition';
 
 import { useAlbumStore } from '../../store/albumStore';
 import { track } from '../../services/analytics';
 import { parseOCRBlocks, lookupStickerByCode } from './ocrParser';
+import { recognizeText } from './ocrEngine';
 import type { ScanState, ScannedCandidate } from './types';
 
 const EMPTY_MESSAGE =
@@ -55,13 +54,6 @@ export function useStickerScan({ cameraRef, onAfterConfirm }: UseStickerScanArgs
 
   const capture = useCallback(async () => {
     if (inFlight.current) return;
-    if (Platform.OS === 'web') {
-      setState({
-        kind: 'error',
-        message: 'El escaneo está disponible en la app móvil.',
-      });
-      return;
-    }
     inFlight.current = true;
     let photoUri: string | null = null;
     setState({ kind: 'capturing' });
@@ -91,13 +83,13 @@ export function useStickerScan({ cameraRef, onAfterConfirm }: UseStickerScanArgs
       setState({ kind: 'recognizing' });
 
       const start = Date.now();
-      const result = await TextRecognition.recognize(photo.uri);
+      const blocks = await recognizeText(photo.uri);
       const durationMs = Date.now() - start;
 
       await deleteUriQuietly(photoUri);
       photoUri = null;
 
-      const parsed = parseOCRBlocks(result.blocks);
+      const parsed = parseOCRBlocks(blocks);
       track({
         name: 'scan_recognized',
         params: { candidates: parsed.length, durationMs },
