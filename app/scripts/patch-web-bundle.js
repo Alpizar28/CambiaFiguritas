@@ -97,7 +97,7 @@ fs.writeFileSync(htmlPath, html);
 console.log('[patch-web-bundle] index.html actualizado.');
 
 // Copiar PWA assets (manifest + sw + favicon icons usables como icon-192/512) a dist root.
-const pwaFiles = ['manifest.json', 'ads.txt'];
+const pwaFiles = ['manifest.json', 'ads.txt', 'robots.txt', 'sitemap.xml'];
 for (const f of pwaFiles) {
   const src = path.join(webDir, f);
   if (fs.existsSync(src)) {
