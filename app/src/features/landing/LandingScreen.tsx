@@ -7,42 +7,213 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import Svg, { Path, Circle, Rect, Line, Polyline, Polygon } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserStore } from '../../store/userStore';
 import { useLandingStore } from '../../store/landingStore';
 import { track } from '../../services/analytics';
-import { colors, radii, spacing } from '../../constants/theme';
+import { radii, spacing } from '../../constants/theme';
 
-type Props = {
-  onContinueToLogin: () => void;
-};
+// Paleta mundialista
+const W = {
+  black:      '#0A0A0A',
+  surface:    '#141414',
+  card:       '#1C1C1C',
+  border:     '#2A2A2A',
+  text:       '#FFFFFF',
+  muted:      '#888888',
+  dim:        '#444444',
+
+  gold:       '#FFD700',   // trofeo
+  grass:      '#00B341',   // césped
+  red:        '#E8001C',   // FIFA red
+  sky:        '#009FD4',   // cielo estadio
+  white:      '#FFFFFF',
+
+  goldBg:     'rgba(255,215,0,0.13)',
+  grassBg:    'rgba(0,179,65,0.13)',
+  redBg:      'rgba(232,0,28,0.13)',
+  skyBg:      'rgba(0,159,212,0.13)',
+
+  goldBorder: 'rgba(255,215,0,0.30)',
+  grassBorder:'rgba(0,179,65,0.30)',
+  redBorder:  'rgba(232,0,28,0.30)',
+  skyBorder:  'rgba(0,159,212,0.30)',
+} as const;
+
+type Props = { onContinueToLogin: () => void };
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+
+function IconBall({ size = 28, color = W.gold }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="9.5" stroke={color} strokeWidth="1.6" />
+      <Polygon points="12,4 15.5,9 12,11 8.5,9" stroke={color} strokeWidth="1.2" fill="none" />
+      <Path d="M8.5 9L4.5 11.5M15.5 9L19.5 11.5M12 11v3.5M8.5 14.5L12 14.5M12 14.5L15.5 14.5M4.5 11.5L8.5 14.5M19.5 11.5L15.5 14.5" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconUsers({ size = 28, color = W.grass }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="9" cy="7" r="3.5" stroke={color} strokeWidth="1.6" />
+      <Path d="M3 20c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <Circle cx="17" cy="8" r="2.5" stroke={color} strokeWidth="1.4" />
+      <Path d="M21 20c0-2.761-1.79-5-4-5" stroke={color} strokeWidth="1.4" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconChat({ size = 28, color = W.sky }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
+        stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
+      />
+      <Path d="M8 9h8M8 13h5" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconSearch({ size = 18, color = W.gold }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="11" cy="11" r="7" stroke={color} strokeWidth="1.6" />
+      <Path d="M16.5 16.5L21 21" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconStar({ size = 18, color = W.gold }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+        stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function IconPin({ size = 18, color = W.grass }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <Circle cx="12" cy="10" r="3" stroke={color} strokeWidth="1.6" />
+    </Svg>
+  );
+}
+
+function IconThumb({ size = 18, color = W.grass }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconShare({ size = 18, color = W.sky }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <Polyline points="16,6 12,2 8,6" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <Line x1="12" y1="2" x2="12" y2="15" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconWifi({ size = 18, color = W.sky }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M1 6s5-5 11-5 11 5 11 5" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <Path d="M5 10s3.5-3.5 7-3.5 7 3.5 7 3.5" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <Path d="M8.5 14s1.8-2 3.5-2 3.5 2 3.5 2" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <Circle cx="12" cy="18" r="1.5" fill={color} />
+    </Svg>
+  );
+}
+
+function IconArrowDark({ size = 15 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M5 12h14M12 5l7 7-7 7" stroke={W.black} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function IconArrowLight({ size = 15 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M5 12h14M12 5l7 7-7 7" stroke={W.text} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+// decorative mini ball for hero
+function IconBallSm({ size = 14, color = W.gold }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="9.5" stroke={color} strokeWidth="2" />
+      <Path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
 
 const STEPS = [
   {
-    icon: '📋',
+    Icon: IconBall,
+    number: '01',
     title: 'Marcá tu álbum',
     body: 'Tocá las figuritas que ya tenés y las que te faltan. Doble tap marca repes.',
+    color: W.gold,
+    bg: W.goldBg,
+    border: W.goldBorder,
+    numColor: 'rgba(255,215,0,0.18)',
   },
   {
-    icon: '🤝',
+    Icon: IconUsers,
+    number: '02',
     title: 'Encontrá matches',
     body: 'Te conectamos con usuarios que tienen lo que necesitás y necesitan tus repes.',
+    color: W.grass,
+    bg: W.grassBg,
+    border: W.grassBorder,
+    numColor: 'rgba(0,179,65,0.18)',
   },
   {
-    icon: '💬',
+    Icon: IconChat,
+    number: '03',
     title: 'Coordiná por WhatsApp',
     body: 'Mensaje pre-armado con códigos de figuritas. Cero fricción para coordinar.',
+    color: W.sky,
+    bg: W.skyBg,
+    border: W.skyBorder,
+    numColor: 'rgba(0,159,212,0.18)',
   },
-];
+] as const;
 
 const FEATURES = [
-  '🔍 Búsqueda por código (ARG12)',
-  '⭐ Marcá prioridades para mejores matches',
-  '📍 Ordenado por cercanía',
-  '👍 Reputación de usuarios',
-  '📤 Compartí tu progreso como imagen',
-  '📱 Funciona offline en tu celular',
-];
+  { Icon: IconSearch, label: 'Búsqueda por código',   color: W.gold,  bg: W.goldBg,  border: W.goldBorder  },
+  { Icon: IconStar,   label: 'Prioridades de match',  color: W.gold,  bg: W.goldBg,  border: W.goldBorder  },
+  { Icon: IconPin,    label: 'Por cercanía',           color: W.grass, bg: W.grassBg, border: W.grassBorder },
+  { Icon: IconThumb,  label: 'Reputación',             color: W.grass, bg: W.grassBg, border: W.grassBorder },
+  { Icon: IconShare,  label: 'Compartí tu progreso',   color: W.sky,   bg: W.skyBg,   border: W.skyBorder   },
+  { Icon: IconWifi,   label: 'Funciona offline',        color: W.sky,   bg: W.skyBg,   border: W.skyBorder   },
+] as const;
+
+const STATS = [
+  { value: '669', label: 'Figuritas', color: W.gold,  bg: W.goldBg  },
+  { value: '32',  label: 'Selecciones', color: W.grass, bg: W.grassBg },
+  { value: 'Free', label: '100% gratis', color: W.sky,   bg: W.skyBg  },
+] as const;
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function LandingScreen({ onContinueToLogin }: Props) {
   const insets = useSafeAreaInsets();
@@ -51,9 +222,7 @@ export function LandingScreen({ onContinueToLogin }: Props) {
   const enterDemo = useUserStore((s) => s.enterDemo);
   const markLandingSeen = useLandingStore((s) => s.markSeen);
 
-  useEffect(() => {
-    track({ name: 'landing_viewed' });
-  }, []);
+  useEffect(() => { track({ name: 'landing_viewed' }); }, []);
 
   const handleStart = () => {
     track({ name: 'landing_cta_clicked', params: { cta: 'start' } });
@@ -75,15 +244,24 @@ export function LandingScreen({ onContinueToLogin }: Props) {
       ]}
       showsVerticalScrollIndicator={false}
     >
+      {/* ── HERO ── */}
       <View style={styles.hero}>
+
+        {/* pill badge */}
         <View style={styles.eyebrowRow}>
-          <View style={styles.eyebrowDot} />
-          <Text style={styles.eyebrow}>Mundial 2026</Text>
+          <IconBallSm size={13} color={W.gold} />
+          <Text style={styles.eyebrow}>Mundial FIFA 2026</Text>
+          <View style={styles.eyebrowLive} />
         </View>
+
+        {/* headline con colores mundialistas */}
         <Text style={styles.heroTitle}>
-          Completá tu álbum,{'\n'}
-          <Text style={styles.heroAccent}>encontrá tus matches.</Text>
+          <Text style={{ color: W.white }}>Completá{'\n'}</Text>
+          <Text style={{ color: W.gold }}>tu álbum,{'\n'}</Text>
+          <Text style={{ color: W.grass }}>encontrá </Text>
+          <Text style={{ color: W.sky }}>matches.</Text>
         </Text>
+
         <Text style={styles.heroSubtitle}>
           La forma inteligente de intercambiar figuritas con coleccionistas reales cerca tuyo.
         </Text>
@@ -91,72 +269,119 @@ export function LandingScreen({ onContinueToLogin }: Props) {
         <View style={[styles.ctaRow, !isWide && styles.ctaColumn]}>
           <Pressable style={styles.primaryButton} onPress={handleStart}>
             <Text style={styles.primaryButtonText}>Empezar gratis</Text>
+            <IconArrowDark size={15} />
           </Pressable>
           <Pressable style={styles.secondaryButton} onPress={handleDemo}>
-            <Text style={styles.secondaryButtonText}>Ver demo →</Text>
+            <Text style={styles.secondaryButtonText}>Ver demo</Text>
+            <IconArrowLight size={15} />
           </Pressable>
         </View>
 
-        <Text style={styles.heroFootnote}>Sin tarjeta · 669 figuritas oficiales</Text>
+        <Text style={styles.heroFootnote}>Sin tarjeta · 669 figuritas oficiales · Panini</Text>
       </View>
 
-      <View style={styles.divider} />
+      {/* ── STATS BAR ── */}
+      <View style={[styles.statsBar, isWide && styles.statsBarWide]}>
+        {STATS.map((stat, i) => (
+          <View
+            key={stat.label}
+            style={[
+              styles.statItem,
+              { backgroundColor: stat.bg },
+              i < STATS.length - 1 && styles.statItemBorder,
+            ]}
+          >
+            <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
+            <Text style={styles.statLabel}>{stat.label}</Text>
+          </View>
+        ))}
+      </View>
 
+      {/* ── STEPS ── */}
       <View style={styles.section}>
-        <Text style={styles.sectionEyebrow}>Cómo funciona</Text>
-        <Text style={styles.sectionTitle}>Tres pasos.{'\n'}Cero fricción.</Text>
+        <View style={styles.sectionLabelRow}>
+          <View style={[styles.sectionLabelDot, { backgroundColor: W.grass }]} />
+          <Text style={[styles.sectionEyebrow, { color: W.grass }]}>Cómo funciona</Text>
+        </View>
+        <Text style={styles.sectionTitle}>
+          <Text style={{ color: W.white }}>Tres pasos. </Text>
+          <Text style={{ color: W.gold }}>Cero fricción.</Text>
+        </Text>
         <View style={[styles.stepsRow, !isWide && styles.stepsColumn]}>
-          {STEPS.map((step, idx) => (
-            <View key={step.title} style={[styles.stepCard, isWide && styles.stepCardWide]}>
-              <Text style={styles.stepNumber}>{String(idx + 1).padStart(2, '0')}</Text>
-              <Text style={styles.stepIcon}>{step.icon}</Text>
-              <Text style={styles.stepTitle}>{step.title}</Text>
+          {STEPS.map((step) => (
+            <View
+              key={step.title}
+              style={[
+                styles.stepCard,
+                isWide && styles.stepCardWide,
+                { borderColor: step.border, backgroundColor: step.bg },
+              ]}
+            >
+              <View style={styles.stepTopRow}>
+                <Text style={[styles.stepNumber, { color: step.numColor }]}>{step.number}</Text>
+                <View style={[styles.stepIconWrap, { borderColor: step.border }]}>
+                  <step.Icon size={26} color={step.color} />
+                </View>
+              </View>
+              <Text style={[styles.stepTitle, { color: step.color }]}>{step.title}</Text>
               <Text style={styles.stepBody}>{step.body}</Text>
             </View>
           ))}
         </View>
       </View>
 
+      {/* ── FEATURES ── */}
       <View style={styles.featuresBlock}>
+        <View style={styles.sectionLabelRow}>
+          <View style={[styles.sectionLabelDot, { backgroundColor: W.gold }]} />
+          <Text style={[styles.sectionEyebrow, { color: W.gold }]}>Funciones</Text>
+        </View>
         <Text style={styles.featuresTitle}>Todo lo que necesitás</Text>
         <View style={styles.featuresGrid}>
-          {FEATURES.map((f) => (
-            <View key={f} style={styles.featureChip}>
-              <Text style={styles.featureChipText}>{f}</Text>
+          {FEATURES.map(({ Icon, label, color, bg, border }) => (
+            <View key={label} style={[styles.featureChip, { borderColor: border, backgroundColor: bg }]}>
+              <Icon size={16} color={color} />
+              <Text style={[styles.featureChipText, { color }]}>{label}</Text>
             </View>
           ))}
         </View>
       </View>
 
+      {/* ── FINAL CTA ── */}
       <View style={styles.finalCta}>
+        {/* tricolor top bar */}
+        <View style={styles.tricolorBar} pointerEvents="none">
+          <View style={[styles.tricolorSegment, { backgroundColor: W.gold }]} />
+          <View style={[styles.tricolorSegment, { backgroundColor: W.grass }]} />
+          <View style={[styles.tricolorSegment, { backgroundColor: W.sky }]} />
+        </View>
         <Text style={styles.finalCtaTitle}>Listo para empezar</Text>
         <Text style={styles.finalCtaBody}>
           Sumate gratis. Tu álbum sincroniza entre todos tus dispositivos.
         </Text>
         <Pressable style={styles.primaryButton} onPress={handleStart}>
           <Text style={styles.primaryButtonText}>Crear mi álbum</Text>
+          <IconArrowDark size={15} />
         </Pressable>
       </View>
 
       <Text style={styles.footer}>
-        Hecho por fanáticos del fútbol. CambiaFiguritas no está afiliado a Panini ni a la FIFA.
+        Hecho por fanáticos del fútbol · No afiliado a Panini ni a la FIFA
       </Text>
     </ScrollView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.xl,
-  },
+  container: { flex: 1, backgroundColor: W.black },
+  content:   { paddingHorizontal: spacing.lg, gap: spacing.xl },
+
+  // HERO
   hero: {
     paddingTop: spacing.xl,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.lg,
     alignItems: 'flex-start',
     gap: spacing.md,
     maxWidth: 800,
@@ -165,209 +390,200 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: 'rgba(255,215,0,0.1)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    backgroundColor: W.goldBg,
+    paddingHorizontal: spacing.sm + 4,
+    paddingVertical: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.3)',
+    borderColor: W.goldBorder,
   },
-  eyebrowDot: {
+  eyebrow: {
+    color: W.gold,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
+  eyebrowLive: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#FFD700',
-  },
-  eyebrow: {
-    color: '#FFD700',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    backgroundColor: W.grass,
   },
   heroTitle: {
-    color: colors.text,
-    fontSize: 40,
+    fontSize: 44,
     fontWeight: '900',
-    lineHeight: 46,
-    letterSpacing: -1,
-  },
-  heroAccent: {
-    color: '#FFD700',
+    lineHeight: 52,
+    letterSpacing: -1.5,
   },
   heroSubtitle: {
-    color: colors.textMuted,
+    color: W.muted,
     fontSize: 17,
-    lineHeight: 24,
+    lineHeight: 26,
     maxWidth: 460,
   },
-  ctaRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-    flexWrap: 'wrap',
-  },
-  ctaColumn: {
-    flexDirection: 'column',
-    alignSelf: 'stretch',
-  },
+  ctaRow:    { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },
+  ctaColumn: { flexDirection: 'column', alignSelf: 'stretch' },
   primaryButton: {
-    backgroundColor: '#FFD700',
+    backgroundColor: W.gold,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md + 2,
     borderRadius: radii.md,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs + 2,
     minWidth: 180,
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowColor: W.gold,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  primaryButtonText: {
-    color: '#0A0A0A',
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 0.3,
-  },
+  primaryButtonText: { color: W.black, fontSize: 16, fontWeight: '900', letterSpacing: 0.2 },
   secondaryButton: {
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md + 2,
     borderRadius: radii.md,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs + 2,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.15)',
     minWidth: 180,
   },
-  secondaryButtonText: {
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  heroFootnote: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginTop: spacing.xs,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: spacing.md,
-  },
-  section: {
-    gap: spacing.md,
-  },
-  sectionEyebrow: {
-    color: '#FFD700',
-    fontSize: 12,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-  },
-  sectionTitle: {
-    color: colors.text,
-    fontSize: 32,
-    fontWeight: '900',
-    lineHeight: 36,
-    letterSpacing: -0.5,
-    marginBottom: spacing.sm,
-  },
-  stepsRow: {
+  secondaryButtonText: { color: W.text, fontSize: 16, fontWeight: '700' },
+  heroFootnote: { color: W.dim, fontSize: 12, marginTop: spacing.xs, letterSpacing: 0.2 },
+
+  // STATS BAR
+  statsBar: {
     flexDirection: 'row',
-    gap: spacing.md,
-  },
-  stepsColumn: {
-    flexDirection: 'column',
-  },
-  stepCard: {
-    flex: 1,
-    backgroundColor: colors.surface,
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+  },
+  statsBarWide: { alignSelf: 'flex-start', minWidth: 440 },
+  statItem: {
+    flex: 1,
+    paddingVertical: spacing.md + 4,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    gap: 4,
+  },
+  statItemBorder: { borderRightWidth: 1, borderRightColor: 'rgba(255,255,255,0.07)' },
+  statValue: { fontSize: 30, fontWeight: '900', letterSpacing: -0.5 },
+  statLabel: {
+    color: W.muted,
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+
+  // SECTION LABEL
+  sectionLabelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  sectionLabelDot: { width: 8, height: 8, borderRadius: 4 },
+  sectionEyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+
+  // STEPS
+  section: { gap: spacing.md },
+  sectionTitle: {
+    fontSize: 34,
+    fontWeight: '900',
+    lineHeight: 40,
+    letterSpacing: -0.8,
+    marginBottom: spacing.xs,
+  },
+  stepsRow:    { flexDirection: 'row', gap: spacing.md },
+  stepsColumn: { flexDirection: 'column' },
+  stepCard: {
+    flex: 1,
+    borderRadius: radii.md,
+    borderWidth: 1,
     padding: spacing.lg,
     gap: spacing.sm,
-    minHeight: 180,
+    minHeight: 190,
   },
-  stepCardWide: {
-    flexBasis: '32%',
-  },
-  stepNumber: {
-    color: '#FFD700',
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  stepIcon: {
-    fontSize: 36,
-  },
-  stepTitle: {
-    color: colors.text,
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  stepBody: {
-    color: colors.textMuted,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  featuresBlock: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.xl,
-    gap: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  featuresTitle: {
-    color: colors.text,
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  featuresGrid: {
+  stepCardWide: { flexBasis: '32%' },
+  stepTopRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: spacing.xs,
   },
-  featureChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.background,
+  stepNumber: { fontSize: 40, fontWeight: '900', letterSpacing: -1, lineHeight: 40 },
+  stepIconWrap: {
+    width: 50,
+    height: 50,
     borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  featureChipText: {
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  finalCta: {
-    backgroundColor: 'rgba(255,215,0,0.08)',
+  stepTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
+  stepBody:  { color: W.muted, fontSize: 14, lineHeight: 21 },
+
+  // FEATURES
+  featuresBlock: {
+    backgroundColor: W.surface,
     borderRadius: radii.lg,
     padding: spacing.xl,
     gap: spacing.md,
     borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.25)',
+    borderColor: 'rgba(255,255,255,0.06)',
+  },
+  featuresTitle: { color: W.text, fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
+  featuresGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  featureChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+  },
+  featureChipText: { fontSize: 13, fontWeight: '700' },
+
+  // FINAL CTA
+  finalCta: {
+    backgroundColor: W.surface,
+    borderRadius: radii.lg,
+    padding: spacing.xl,
+    paddingTop: spacing.xl + 4,
+    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
     alignItems: 'flex-start',
+    overflow: 'hidden',
   },
-  finalCtaTitle: {
-    color: colors.text,
-    fontSize: 26,
-    fontWeight: '900',
-    letterSpacing: -0.5,
+  tricolorBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+    flexDirection: 'row',
   },
-  finalCtaBody: {
-    color: colors.textMuted,
-    fontSize: 15,
-    lineHeight: 22,
-  },
+  tricolorSegment: { flex: 1 },
+  finalCtaTitle: { color: W.text, fontSize: 28, fontWeight: '900', letterSpacing: -0.8 },
+  finalCtaBody:  { color: W.muted, fontSize: 15, lineHeight: 22 },
+
+  // FOOTER
   footer: {
-    color: colors.textMuted,
+    color: W.dim,
     fontSize: 11,
     textAlign: 'center',
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.lg,
-    fontStyle: 'italic',
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+    letterSpacing: 0.1,
   },
 });

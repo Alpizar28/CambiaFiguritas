@@ -62,6 +62,7 @@ type AnalyticsEvent =
   | { name: 'onboarding_completed' }
   | { name: 'share_album_clicked'; params: { stats: string } }
   | { name: 'share_image_generated'; params: { result: string } }
+  | { name: 'share_card_generated'; params: { method: string; showName: boolean; showProgress: boolean; showRepeated: boolean; showMissing: boolean } }
   | { name: 'matches_filter_changed'; params: { filter: string } }
   | { name: 'web_vital_reported'; params: { metric: string; value: number; rating: string } }
   | { name: 'sticker_searched_by_code'; params: { code: string; matched: boolean } }
@@ -97,7 +98,11 @@ type AnalyticsEvent =
   | { name: 'match_batch_saved'; params: { size: number; filter: string } }
   | { name: 'match_history_opened'; params: { batchCount: number } }
   | { name: 'match_history_batch_expanded'; params: { batchId: string; ageDays: number } }
-  | { name: 'match_history_whatsapp_clicked'; params: { matchUid: string; ageDays: number } };
+  | { name: 'match_history_whatsapp_clicked'; params: { matchUid: string; ageDays: number } }
+  | { name: 'match_share_clicked'; params: { isPerfectTrade: boolean; matchUid: string } }
+  | { name: 'matches_referral_shared'; params: { uid: string } }
+  | { name: 'onboarding_invite_shown' }
+  | { name: 'onboarding_invite_clicked' };
 
 let analyticsInstance: Analytics | null = null;
 let initPromise: Promise<Analytics | null> | null = null;

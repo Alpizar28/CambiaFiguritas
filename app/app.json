@@ -55,6 +55,17 @@
           "userTrackingUsageDescription": "Esto permite mostrar publicidad relevante y mantener la app gratuita."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "95b2d002-c701-4924-a031-653d20ca788c"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/95b2d002-c701-4924-a031-653d20ca788c"
+    }
   }
 }

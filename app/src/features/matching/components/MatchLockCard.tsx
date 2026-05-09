@@ -1,5 +1,6 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors, radii, spacing } from '../../../constants/theme';
+import { ENABLE_PREMIUM_UI } from '../../../constants/featureFlags';
 
 type Props = {
   used: number;
@@ -50,10 +51,14 @@ export function MatchLockCard({
           {adReason ? <Text style={styles.adButtonHint}>{adReason}</Text> : null}
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.premiumButton} onPress={onGoPremium}>
-          <Text style={styles.premiumButtonText}>✨ Hacete Premium · Ilimitado</Text>
-          <Text style={styles.premiumButtonHint}>USD 2.99 · pago único</Text>
-        </TouchableOpacity>
+        {ENABLE_PREMIUM_UI ? (
+          <TouchableOpacity style={styles.premiumButton} onPress={onGoPremium}>
+            <Text style={styles.premiumButtonText}>✨ Hacete Premium · Ilimitado</Text>
+            <Text style={styles.premiumButtonHint}>USD 2.99 · pago único</Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={styles.resetHint}>Volvé en {resetIn} para más búsquedas.</Text>
+        )}
       </View>
     </View>
   );
@@ -129,5 +134,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     opacity: 0.7,
     marginTop: 2,
+  },
+  resetHint: {
+    color: colors.textMuted,
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: spacing.xs,
   },
 });

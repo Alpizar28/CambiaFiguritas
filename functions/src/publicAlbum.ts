@@ -14,9 +14,9 @@ type UserDoc = {
   name?: string;
   city?: string;
   photoUrl?: string;
-  hideProgress?: boolean;
-  hideRepeated?: boolean;
-  anonymousMode?: boolean;
+  privacyHideProgress?: boolean;
+  privacyHideRepeated?: boolean;
+  privacyAnonymous?: boolean;
 };
 
 type PublicAlbumResponse = {
@@ -102,9 +102,9 @@ export const getPublicAlbum = onRequest(
       const user = userSnap.data() as UserDoc;
       const album = albumSnap.exists ? (albumSnap.data() as AlbumDoc) : {};
 
-      const hideProgress = user.hideProgress === true;
-      const hideRepeated = user.hideRepeated === true;
-      const anonymous = user.anonymousMode === true;
+      const hideProgress = user.privacyHideProgress === true;
+      const hideRepeated = user.privacyHideRepeated === true;
+      const anonymous = user.privacyAnonymous === true;
 
       const sanitized = sanitizeStatuses(album.statuses);
       let { statuses } = sanitized;

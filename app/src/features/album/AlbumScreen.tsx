@@ -23,6 +23,9 @@ import { allStickers, countryStickerGroups, specialStickerGroup } from './data/a
 import { haptic } from '../../utils/haptics';
 import { track } from '../../services/analytics';
 import { Tooltip } from '../../components/Tooltip';
+import { useUserStore } from '../../store/userStore';
+
+import { ShareCardModal } from '../profile/components/ShareCardModal';
 import type { AlbumSlot, CountryAlbumPage, Sticker, StickerStatus } from './types';
 import { fuzzyContains } from './utils/fuzzyMatch';
 
@@ -100,6 +103,8 @@ export function AlbumScreen() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isDesktop = width >= 900;
+  const uid = useUserStore((s) => s.user?.uid);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   const [activeGroupIndex, setActiveGroupIndex] = useState(0);
   const [activeCountryPage, setActiveCountryPage] = useState<1 | 2>(1);
@@ -132,6 +137,12 @@ export function AlbumScreen() {
   const activeGroup = stickerGroups[activeGroupIndex];
   const stats = getStats();
   const activeStats = getGroupStats(activeGroup.stickers, statuses);
+
+  const handleShareCard = () => {
+    haptic.tap();
+    track({ name: 'share_album_clicked', params: { stats: 'header_card' } });
+    setShareModalOpen(true);
+  };
   const normalizedQuery = query.trim().toLowerCase();
   const isSpecials = activeGroup.country.id === 'especiales';
 
@@ -343,6 +354,14 @@ export function AlbumScreen() {
               </Text>
             </View>
             <Pressable
+              accessibilityLabel="Compartir tu figurita"
+              onPress={handleShareCard}
+              style={styles.shareAlbumBtn}
+            >
+              <Text style={styles.shareAlbumIcon}>⬆</Text>
+              <Text style={styles.shareAlbumText}>Compartir figurita</Text>
+            </Pressable>
+            <Pressable
               accessibilityLabel="Buscar"
               onPress={() => { haptic.tap(); setSearchOpen((v) => !v); }}
               style={styles.iconButton}
@@ -519,6 +538,7 @@ export function AlbumScreen() {
           onDecrement={() => sheetStickerId && decrementRepeated(sheetStickerId)}
           onClose={closeSheet}
         />
+      <ShareCardModal visible={shareModalOpen} onClose={() => setShareModalOpen(false)} />
       </View>
     );
   }
@@ -691,6 +711,7 @@ export function AlbumScreen() {
           )}
         </View>
       </ScrollView>
+      <ShareCardModal visible={shareModalOpen} onClose={() => setShareModalOpen(false)} />
     </View>
   );
 }
@@ -765,6 +786,29 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     lineHeight: 24,
+  },
+  shareAlbumBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,214,0,0.12)',
+    borderColor: '#FFD600',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  shareAlbumIcon: {
+    color: '#FFD600',
+    fontSize: 13,
+    fontWeight: '900',
+    lineHeight: 16,
+  },
+  shareAlbumText: {
+    color: '#FFD600',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   searchCardMobile: {
     flexDirection: 'row',

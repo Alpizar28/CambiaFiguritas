@@ -56,7 +56,7 @@ export async function grantPremium(
           body: 'Matches ilimitados activados. Sin anuncios. Gracias por apoyar la app.',
         },
         webpush: {
-          fcmOptions: { link: 'https://cambiafiguritas.web.app/' },
+          fcmOptions: { link: 'https://cambiafiguritas.online/' },
           notification: { icon: '/icon-192.png', badge: '/icon-192.png' },
         },
         data: { type: 'premium_granted', source },

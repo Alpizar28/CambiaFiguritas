@@ -6,6 +6,7 @@ import { useUserStore } from '../../../store/userStore';
 import { track } from '../../../services/analytics';
 import { colors, radii, spacing } from '../../../constants/theme';
 import { purchasePremium } from '../../../services/playBilling';
+import { ENABLE_PREMIUM_UI } from '../../../constants/featureFlags';
 
 type Props = {
   variant?: 'full' | 'compact';
@@ -27,6 +28,7 @@ export function PremiumCard({ variant = 'full' }: Props) {
   const [stubModal, setStubModal] = useState<{ orderId: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  if (!ENABLE_PREMIUM_UI) return null;
   if (user?.premium) return null;
 
   const handleUpgrade = async () => {

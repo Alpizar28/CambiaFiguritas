@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Linking, Modal, Pressable } from 'react-native';
 import type { Match } from '../../../services/matchingService';
 import { formatDistance } from '../../../utils/distance';
@@ -8,6 +8,9 @@ import type { Sticker } from '../../album/types';
 import { recordReputationVote } from '../../../services/userService';
 import { useUserStore } from '../../../store/userStore';
 import { colors, spacing, radii } from '../../../constants/theme';
+import { ENABLE_PREMIUM_UI } from '../../../constants/featureFlags';
+import { vsCardToBlob, renderVsCardToCanvas, type VsCardConfig } from '../../../utils/shareCard';
+import { useGooglePhotoDataUrl } from '../../../utils/useGooglePhotoDataUrl';
 
 type Props = {
   match: Match;
@@ -56,7 +59,12 @@ export function MatchCard({ match, onPress }: Props) {
   const [voteModalOpen, setVoteModalOpen] = useState(false);
   const [voteSubmitting, setVoteSubmitting] = useState(false);
   const [voteFeedback, setVoteFeedback] = useState<string | null>(null);
-  const currentUid = useUserStore((s) => s.user?.uid);
+  const [sharing, setSharing] = useState(false);
+  const [vsPreview, setVsPreview] = useState<{ blob: Blob; url: string } | null>(null);
+  const currentUser = useUserStore((s) => s.user);
+  const currentUid = currentUser?.uid;
+  const myPhotoDataUrl = useGooglePhotoDataUrl(currentUser?.photoUrl);
+  const vsCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const priorityIdSet = useMemo(() => new Set(iNeedPriorityIds), [iNeedPriorityIds]);
 
   const iNeedGrouped = useMemo(() => groupByCountry(iNeedIds, priorityIdSet), [iNeedIds, priorityIdSet]);
@@ -109,6 +117,70 @@ export function MatchCard({ match, onPress }: Props) {
     if (next) track({ name: 'match_details_opened', params: { matchUid: user.uid } });
   };
 
+  const buildVsConfig = (): VsCardConfig => ({
+    myUid: currentUid ?? '',
+    myName: currentUser?.name ?? 'Yo',
+    myPhotoUrl: myPhotoDataUrl.current ?? currentUser?.photoUrl ?? undefined,
+    myCity: currentUser?.city ?? undefined,
+    theirName: displayName,
+    theirPhotoUrl: displayPhoto ?? undefined,
+    theirCity: displayCity ?? undefined,
+    iGiveIds: theyNeedIds,
+    iGiveTotal: theyNeedFromMe,
+    iReceiveIds: iNeedIds,
+    iReceiveTotal: iNeedFromThem,
+    isPerfectTrade: !!isPerfectTrade,
+  });
+
+  const handleShareMatch = async (e?: { stopPropagation?: () => void }) => {
+    e?.stopPropagation?.();
+    if (sharing) return;
+    setSharing(true);
+    track({ name: 'match_share_clicked', params: { isPerfectTrade: !!isPerfectTrade, matchUid: user.uid } });
+    try {
+      const blob = await vsCardToBlob(buildVsConfig());
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      setVsPreview({ blob, url });
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const closePreview = () => {
+    if (vsPreview) URL.revokeObjectURL(vsPreview.url);
+    setVsPreview(null);
+  };
+
+  const doShare = async () => {
+    if (!vsPreview) return;
+    const fileName = 'match-cambiafiguritas.png';
+    const navAny = navigator as unknown as Record<string, unknown>;
+    if (typeof navAny['canShare'] === 'function' && typeof navAny['share'] === 'function') {
+      try {
+        const file = new File([vsPreview.blob], fileName, { type: 'image/png' });
+        if ((navAny['canShare'] as (d: unknown) => boolean)({ files: [file] })) {
+          await (navAny['share'] as (d: unknown) => Promise<void>)({
+            files: [file],
+            text: `¡Match con ${displayName}! cambiafiguritas.online`,
+          });
+          closePreview();
+          return;
+        }
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') return;
+      }
+    }
+    // Fallback: download
+    const a = document.createElement('a');
+    a.href = vsPreview.url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    closePreview();
+  };
+
   // Privacidad aplicada al renderizar a OTRO user. Si tiene flags activos,
   // ocultamos identidad / repes específicos. El score y los counts agregados
   // siguen mostrándose para que el match sea funcional.
@@ -121,9 +193,10 @@ export function MatchCard({ match, onPress }: Props) {
   const cardContent = (
     <>
       {isPerfectTrade ? (
-        <View style={styles.perfectBadge}>
-          <Text style={styles.perfectBadgeText}>🤝 Intercambio perfecto</Text>
-        </View>
+        <TouchableOpacity style={styles.perfectBanner} onPress={handleShareMatch} activeOpacity={0.8}>
+          <Text style={styles.perfectBannerText}>🤝 ¡Intercambio perfecto! Compartilo</Text>
+          <Text style={styles.perfectBannerArrow}>→</Text>
+        </TouchableOpacity>
       ) : null}
       <View style={styles.header}>
         {displayPhoto ? (
@@ -136,7 +209,7 @@ export function MatchCard({ match, onPress }: Props) {
         <View style={styles.info}>
           <View style={styles.nameRow}>
             <Text style={styles.name} numberOfLines={1}>{displayName}</Text>
-            {!isAnonymous && user.premium ? <Text style={styles.premiumStar}>⭐</Text> : null}
+            {ENABLE_PREMIUM_UI && !isAnonymous && user.premium ? <Text style={styles.premiumStar}>⭐</Text> : null}
             {!isAnonymous && isVerified ? (
               <View style={styles.verifiedChip}>
                 <Text style={styles.verifiedChipText}>✓ Verificado</Text>
@@ -202,11 +275,16 @@ export function MatchCard({ match, onPress }: Props) {
         </View>
       ) : null}
 
-      {user.whatsapp ? (
-        <TouchableOpacity style={styles.waButton} onPress={openWhatsApp}>
-          <Text style={styles.waText}>Contactar por WhatsApp</Text>
+      <View style={styles.footerRow}>
+        {user.whatsapp ? (
+          <TouchableOpacity style={[styles.waButton, styles.footerBtnFlex]} onPress={openWhatsApp}>
+            <Text style={styles.waText}>WhatsApp</Text>
+          </TouchableOpacity>
+        ) : null}
+        <TouchableOpacity style={[styles.shareButton, styles.footerBtnFlex, sharing && styles.disabled]} onPress={handleShareMatch} disabled={sharing}>
+          <Text style={styles.shareButtonText}>{sharing ? 'Generando…' : 'Compartir match'}</Text>
         </TouchableOpacity>
-      ) : null}
+      </View>
 
       {onPress ? (
         <View style={styles.viewMore}>
@@ -246,6 +324,30 @@ export function MatchCard({ match, onPress }: Props) {
             </TouchableOpacity>
           </Pressable>
         </Pressable>
+      </Modal>
+
+      {/* VS Card Preview Modal */}
+      <Modal visible={!!vsPreview} transparent animationType="slide" onRequestClose={closePreview}>
+        <Pressable style={styles.modalBackdrop} onPress={closePreview} />
+        <View style={styles.vsPreviewSheet}>
+          <View style={styles.vsHandle} />
+          <Text style={styles.vsPreviewTitle}>Tu tarjeta de match</Text>
+          {vsPreview ? (
+            <img
+              src={vsPreview.url}
+              alt="match"
+              style={{ width: '100%', maxHeight: 420, objectFit: 'contain', borderRadius: 12 } as React.CSSProperties}
+            />
+          ) : null}
+          <View style={styles.vsActions}>
+            <TouchableOpacity style={styles.vsShareBtn} onPress={doShare}>
+              <Text style={styles.vsShareBtnText}>Compartir</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.vsCloseBtn} onPress={closePreview}>
+              <Text style={styles.vsCloseBtnText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </>
   );
@@ -357,21 +459,111 @@ const styles = StyleSheet.create({
     borderColor: '#FFD700',
     borderWidth: 2,
   },
-  perfectBadge: {
-    alignSelf: 'flex-start',
+  perfectBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: 'rgba(255,215,0,0.15)',
     borderColor: '#FFD700',
     borderWidth: 1,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    paddingVertical: 8,
     marginBottom: 4,
   },
-  perfectBadgeText: {
+  perfectBannerText: {
     color: '#FFD700',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.3,
+    flex: 1,
+  },
+  perfectBannerArrow: {
+    color: '#FFD700',
+    fontSize: 16,
+    fontWeight: '800',
+    marginLeft: 4,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  footerBtnFlex: {
+    flex: 1,
+  },
+  shareButton: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.sm,
+    padding: spacing.sm,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  shareButtonText: {
+    color: colors.text,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  disabled: {
+    opacity: 0.5,
+  },
+  vsPreviewSheet: {
+    position: 'absolute' as const,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.md,
+    paddingBottom: spacing.xl,
+    gap: spacing.md,
+  },
+  vsHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    alignSelf: 'center' as const,
+    marginBottom: spacing.xs,
+  },
+  vsPreviewTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center' as const,
+  },
+  vsActions: {
+    flexDirection: 'row' as const,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  vsShareBtn: {
+    flex: 1,
+    backgroundColor: colors.accent,
+    borderRadius: radii.md,
+    paddingVertical: 14,
+    alignItems: 'center' as const,
+  },
+  vsShareBtnText: {
+    color: colors.background,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  vsCloseBtn: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    paddingVertical: 14,
+    alignItems: 'center' as const,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  vsCloseBtnText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '600',
   },
   nameRow: {
     flexDirection: 'row',

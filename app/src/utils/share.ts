@@ -1,6 +1,6 @@
 import { Platform, Share } from 'react-native';
 
-type ShareResult = 'shared' | 'copied' | 'cancelled' | 'error';
+export type ShareResult = 'shared' | 'copied' | 'cancelled' | 'error';
 
 /**
  * Comparte texto cross-platform.
@@ -40,4 +40,13 @@ export async function shareText(message: string, url?: string): Promise<ShareRes
   } catch {
     return 'error';
   }
+}
+
+export async function shareInviteWithRef(uid: string): Promise<ShareResult> {
+  const trimmed = uid.trim();
+  const url = trimmed
+    ? `https://cambiafiguritas.online?ref=${encodeURIComponent(trimmed)}`
+    : 'https://cambiafiguritas.online';
+  const message = '¡Sumate a CambiaFiguritas para intercambiar figuritas del Mundial 2026!';
+  return shareText(message, url);
 }

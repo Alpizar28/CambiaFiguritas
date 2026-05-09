@@ -94,7 +94,7 @@ function drawCard(ctx: CanvasRenderingContext2D, input: GenerateInput): void {
   ctx.fillText('¿Te faltan? ¿Tenés repes?', W / 2, 1620);
   ctx.fillStyle = '#FFD700';
   ctx.font = '800 52px system-ui, sans-serif';
-  ctx.fillText('cambiafiguritas.web.app', W / 2, 1700);
+  ctx.fillText('cambiafiguritas.online', W / 2, 1700);
 
   ctx.fillStyle = '#666666';
   ctx.font = '500 28px system-ui, sans-serif';

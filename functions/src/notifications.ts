@@ -150,7 +150,7 @@ export const onAlbumUpdateNotify = onDocumentWritten(
             body: `${sourceName} subió ${matchCountText} que estás buscando.`,
           },
           webpush: {
-            fcmOptions: { link: 'https://cambiafiguritas.web.app/' },
+            fcmOptions: { link: 'https://cambiafiguritas.online/' },
             notification: { icon: '/icon-192.png', badge: '/icon-192.png' },
           },
           data: {

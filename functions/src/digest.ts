@@ -124,7 +124,7 @@ export const dailyDigest = onSchedule(
       const ok = await sendPushSafe(uid, user.fcmToken, {
         notification: { title: 'Tu resumen diario 🎯', body },
         webpush: {
-          fcmOptions: { link: 'https://cambiafiguritas.web.app/' },
+          fcmOptions: { link: 'https://cambiafiguritas.online/' },
           notification: { icon: '/icon-192.png', badge: '/icon-192.png' },
         },
         data: { type: 'daily_digest', count: String(matchCount) },

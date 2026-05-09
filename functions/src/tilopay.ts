@@ -6,7 +6,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { grantPremium } from './payments/entitlement';
 
 const PREMIUM_PRICE_USD = 2.99;
-const APP_URL = 'https://cambiafiguritas.web.app';
+const APP_URL = 'https://cambiafiguritas.online';
 
 const TILOPAY_API_KEY = defineSecret('TILOPAY_API_KEY');
 const TILOPAY_MERCHANT_ID = defineSecret('TILOPAY_MERCHANT_ID');

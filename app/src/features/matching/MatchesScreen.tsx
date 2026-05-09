@@ -22,6 +22,10 @@ import { saveMatchBatch } from '../../services/matchHistoryService';
 import { citySlug } from '../../utils/citySlug';
 import { track } from '../../services/analytics';
 import { shareText } from '../../utils/share';
+import { vsCardToBlob, type VsCardConfig } from '../../utils/shareCard';
+import { useGooglePhotoDataUrl } from '../../utils/useGooglePhotoDataUrl';
+import { allStickers } from '../album/data/albumCatalog';
+import type { Sticker } from '../album/types';
 import { MatchRow } from './components/MatchRow';
 import { MatchDetailModal } from './components/MatchDetailModal';
 import { MatchHistoryScreen } from './MatchHistoryScreen';
@@ -38,8 +42,11 @@ import {
 } from './utils/matchFilter';
 import type { Match } from '../../services/matchingService';
 import { colors, spacing, radii } from '../../constants/theme';
+import { ENABLE_PREMIUM_UI } from '../../constants/featureFlags';
 import type { RootTabParamList } from '../../types/navigation';
 import { Modal } from 'react-native';
+
+const stickerIndex = new Map<string, Sticker>(allStickers.map((s) => [s.id, s]));
 
 const CACHE_MS = 60_000;
 const FILTER_STORAGE_KEY = '@cf:matches:zoneFilter';
@@ -57,7 +64,7 @@ export function MatchesScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<RootTabParamList>>();
   const user = useUserStore((s) => s.user);
   const uid = user?.uid;
-  const isPremium = user?.premium === true;
+  const isPremium = ENABLE_PREMIUM_UI && user?.premium === true;
   const statuses = useAlbumStore((s) => s.statuses);
   const wishlist = useWishlistStore((s) => s.items);
   const { matches, loading, error, lastFetched, setMatches, setLoading, setError } = useMatchStore();
@@ -72,10 +79,103 @@ export function MatchesScreen() {
   const [adReason, setAdReason] = useState<string | undefined>(undefined);
   const [detailMatch, setDetailMatch] = useState<Match | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [vsPreview, setVsPreview] = useState<{ blob: Blob; objectUrl: string; match: Match } | null>(null);
+  const [vsGenerating, setVsGenerating] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState(false);
+  const myPhotoDataUrlRef = useGooglePhotoDataUrl(user?.photoUrl);
 
   const userCity = user?.city?.trim() ?? '';
   const userCitySlug = userCity ? citySlug(userCity) : null;
   const hasCity = Boolean(userCitySlug);
+
+  const openVsPreview = async (match: Match) => {
+    if (vsGenerating) return;
+    setVsGenerating(true);
+    try {
+      const m = match;
+      const isAnonymous = !!m.user.privacyAnonymous;
+      const cfg: VsCardConfig = {
+        myUid: uid ?? '',
+        myName: user?.name ?? 'Yo',
+        myPhotoUrl: myPhotoDataUrlRef.current ?? user?.photoUrl ?? undefined,
+        myCity: user?.city ?? undefined,
+        theirName: isAnonymous ? 'Coleccionista' : m.user.name,
+        theirPhotoUrl: isAnonymous ? undefined : (m.user.photoUrl ?? undefined),
+        theirCity: isAnonymous ? undefined : (m.user.city ?? undefined),
+        iGiveIds: m.theyNeedIds,
+        iGiveTotal: m.theyNeedFromMe,
+        iReceiveIds: m.iNeedIds,
+        iReceiveTotal: m.iNeedFromThem,
+        isPerfectTrade: !!m.isPerfectTrade,
+      };
+      const blob = await vsCardToBlob(cfg);
+      if (!blob) return;
+      const objectUrl = URL.createObjectURL(blob);
+      setVsPreview({ blob, objectUrl, match });
+      track({ name: 'match_share_clicked', params: { isPerfectTrade: !!m.isPerfectTrade, matchUid: m.user.uid } });
+    } finally {
+      setVsGenerating(false);
+    }
+  };
+
+  const closeVsPreview = () => {
+    if (vsPreview) URL.revokeObjectURL(vsPreview.objectUrl);
+    setVsPreview(null);
+  };
+
+  const doVsShare = async () => {
+    if (!vsPreview) return;
+    const fileName = 'match-cambiafiguritas.png';
+    const navAny = navigator as unknown as Record<string, unknown>;
+    const isAnonymous = !!vsPreview.match.user.privacyAnonymous;
+    const theirName = isAnonymous ? 'alguien' : (vsPreview.match.user.name?.split(' ')[0] ?? 'alguien');
+    if (typeof navAny['canShare'] === 'function' && typeof navAny['share'] === 'function') {
+      try {
+        const file = new File([vsPreview.blob], fileName, { type: 'image/png' });
+        if ((navAny['canShare'] as (d: unknown) => boolean)({ files: [file] })) {
+          await (navAny['share'] as (d: unknown) => Promise<void>)({
+            files: [file],
+            text: `¡Match con ${theirName}! cambiafiguritas.online`,
+          });
+          closeVsPreview();
+          return;
+        }
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') return;
+      }
+    }
+    const a = document.createElement('a');
+    a.href = vsPreview.objectUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    closeVsPreview();
+  };
+
+  const copyMatchList = async () => {
+    if (!vsPreview) return;
+    const m = vsPreview.match;
+    const toCode = (id: string) => stickerIndex.get(id)?.displayCode ?? id;
+    const giveList = m.theyNeedIds.map(toCode).join(', ');
+    const receiveList = m.iNeedIds.map(toCode).join(', ');
+    const isAnonymous = !!m.user.privacyAnonymous;
+    const theirName = isAnonymous ? 'el match' : (m.user.name?.split(' ')[0] ?? 'el match');
+    const text = [
+      `Intercambio con ${theirName} — CambiaFiguritas`,
+      '',
+      `YO DOY (${m.theyNeedFromMe}): ${giveList}`,
+      '',
+      `YO RECIBO (${m.iNeedFromThem}): ${receiveList}`,
+      '',
+      `cambiafiguritas.online/u/${uid}`,
+    ].join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyFeedback(true);
+      setTimeout(() => setCopyFeedback(false), 2000);
+    } catch { /* clipboard not available */ }
+  };
 
   // Restore filter persistido al primer mount
   useEffect(() => {
@@ -275,10 +375,13 @@ export function MatchesScreen() {
   };
 
   const handleShareInvite = async () => {
-    track({ name: 'matches_empty_cta_clicked', params: { reason: 'invite' } });
+    track({ name: 'matches_referral_shared', params: { uid: uid ?? '' } });
+    const refUrl = uid
+      ? `https://cambiafiguritas.online?ref=${uid}`
+      : 'https://cambiafiguritas.online';
     await shareText(
-      '¡Sumate a CambiaFiguritas para intercambiar figuritas del Mundial 2026!',
-      'https://cambiafiguritas.web.app',
+      '¡Sumate a CambiaFiguritas! Yo ya encontré matches para intercambiar figuritas del Mundial 2026. Entrá acá:',
+      refUrl,
     );
   };
 
@@ -336,17 +439,21 @@ export function MatchesScreen() {
         <EmptyState
           icon="🔁"
           title="Aún no tenés repetidas"
-          message="Marcá las figuritas que tenés repetidas (toque doble) para que otros usuarios puedan intercambiarlas con vos."
+          message="Marcá las figuritas repetidas (toque doble) para intercambiarlas. Cuantos más amigos tengan la app, más matches encontrás."
           ctaLabel="Ir al álbum"
           onCta={goToAlbum}
+          secondaryLabel="Invitar amigos"
+          onSecondaryCta={handleShareInvite}
         />
       ) : myOwned < 10 ? (
         <EmptyState
           icon="📈"
           title={`Marcaste ${myOwned} figuritas`}
-          message="Mejorás tus matches marcando al menos 10 figuritas. Los algoritmos recomiendan mejor con más datos tuyos."
+          message="Mejorás tus matches marcando al menos 10 figuritas. También podés invitar amigos para sumar coleccionistas cerca tuyo."
           ctaLabel="Seguir marcando"
           onCta={goToAlbum}
+          secondaryLabel="Invitar amigos"
+          onSecondaryCta={handleShareInvite}
         />
       ) : lockState ? (
         <MatchLockCard
@@ -369,13 +476,13 @@ export function MatchesScreen() {
           data={filteredMatches}
           keyExtractor={(m) => m.user.uid}
           renderItem={({ item }) => (
-            <MatchRow match={item} onPress={() => setDetailMatch(item)} />
+            <MatchRow match={item} onPress={() => openVsPreview(item)} />
           )}
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
           ListHeaderComponent={
             <View>
-              {!isPremium ? (
+              {ENABLE_PREMIUM_UI && !isPremium ? (
                 <View style={styles.premiumBanner}>
                   <PremiumCard variant="compact" />
                 </View>
@@ -384,7 +491,7 @@ export function MatchesScreen() {
                 <>
                   <View style={styles.listHeader}>
                     <Text style={styles.resultCount}>
-                      Top {filteredMatches.length} {isPremium ? '· premium' : ''}
+                      Top {filteredMatches.length} {ENABLE_PREMIUM_UI && isPremium ? '· premium' : ''}
                       {filter !== 'todos' && matches.length > filteredMatches.length
                         ? ` · de ${matches.length} totales`
                         : ''}
@@ -452,6 +559,45 @@ export function MatchesScreen() {
 
       <MatchDetailModal match={detailMatch} onClose={() => setDetailMatch(null)} />
 
+      {/* VS Preview Modal */}
+      <Modal visible={!!vsPreview} transparent animationType="slide" onRequestClose={closeVsPreview}>
+        <Pressable style={vsStyles.backdrop} onPress={closeVsPreview} />
+        <View style={vsStyles.sheet}>
+          <View style={vsStyles.handle} />
+          <Text style={vsStyles.title}>Tu tarjeta de match</Text>
+          {vsPreview ? (
+            <img
+              src={vsPreview.objectUrl}
+              alt="match"
+              style={{ width: '100%', maxHeight: 400, objectFit: 'contain', borderRadius: 12 } as React.CSSProperties}
+            />
+          ) : null}
+          <TouchableOpacity style={vsStyles.shareBtn} onPress={doVsShare}>
+            <Text style={vsStyles.shareBtnText}>Compartir foto</Text>
+          </TouchableOpacity>
+          <View style={vsStyles.actions}>
+            <TouchableOpacity style={vsStyles.detailBtn} onPress={copyMatchList}>
+              <Text style={vsStyles.detailBtnText}>{copyFeedback ? '✓ Copiado' : 'Copiar lista'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={vsStyles.detailBtn} onPress={() => { if (vsPreview) { setDetailMatch(vsPreview.match); closeVsPreview(); } }}>
+              <Text style={vsStyles.detailBtnText}>Ver detalle</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity onPress={closeVsPreview} style={vsStyles.closeBtn}>
+            <Text style={vsStyles.closeBtnText}>Cerrar</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* Loading indicator while generating VS */}
+      <Modal visible={vsGenerating} transparent animationType="fade">
+        <View style={vsStyles.loadingOverlay}>
+          <View style={vsStyles.loadingCard}>
+            <Text style={vsStyles.loadingText}>Generando tarjeta…</Text>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         visible={historyOpen}
         animationType="slide"
@@ -477,12 +623,16 @@ function EmptyState({
   message,
   ctaLabel,
   onCta,
+  secondaryLabel,
+  onSecondaryCta,
 }: {
   icon: string;
   title?: string;
   message: string;
   ctaLabel?: string;
   onCta?: () => void;
+  secondaryLabel?: string;
+  onSecondaryCta?: () => void;
 }) {
   return (
     <View style={styles.center}>
@@ -492,6 +642,11 @@ function EmptyState({
       {ctaLabel && onCta ? (
         <TouchableOpacity style={styles.ctaButton} onPress={onCta}>
           <Text style={styles.ctaButtonText}>{ctaLabel}</Text>
+        </TouchableOpacity>
+      ) : null}
+      {secondaryLabel && onSecondaryCta ? (
+        <TouchableOpacity style={styles.ctaSecondary} onPress={onSecondaryCta}>
+          <Text style={styles.ctaSecondaryText}>{secondaryLabel}</Text>
         </TouchableOpacity>
       ) : null}
     </View>
@@ -642,5 +797,105 @@ const styles = StyleSheet.create({
     color: colors.background,
     fontWeight: '700',
     fontSize: 15,
+  },
+  ctaSecondary: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.md,
+    marginTop: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  ctaSecondaryText: {
+    color: colors.textMuted,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+});
+
+const vsStyles = StyleSheet.create({
+  backdrop: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  sheet: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.md,
+    paddingBottom: spacing.xl,
+    gap: spacing.md,
+  },
+  handle: {
+    width: 36, height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing.xs,
+  },
+  title: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  shareBtn: {
+    flex: 1,
+    backgroundColor: colors.accent,
+    borderRadius: radii.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  shareBtnText: {
+    color: colors.background,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  detailBtn: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  detailBtnText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  closeBtn: {
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  closeBtnText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  loadingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xl,
+  },
+  loadingText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

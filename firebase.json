@@ -40,6 +40,10 @@
         "function": { "functionId": "ogImage", "region": "us-central1" }
       },
       {
+        "source": "/api/publicAlbum",
+        "function": { "functionId": "getPublicAlbum", "region": "us-central1" }
+      },
+      {
         "source": "/privacidad",
         "destination": "/privacidad.html"
       },

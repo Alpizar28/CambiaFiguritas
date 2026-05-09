@@ -24,12 +24,13 @@ import { LegalModal } from './LegalModal';
 import { LEGAL_VERSION, PRIVACY_TEXT, TERMS_TEXT } from './legalContent';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { shareText } from '../../utils/share';
-import { shareStatsImage } from '../../utils/shareImage';
 import { track } from '../../services/analytics';
 import { StatsBreakdown } from './StatsBreakdown';
 import { PremiumCard } from './components/PremiumCard';
+import { ShareCardModal } from './components/ShareCardModal';
 import { Tooltip } from '../../components/Tooltip';
 import { colors, spacing, radii } from '../../constants/theme';
+import { ENABLE_PREMIUM_UI } from '../../constants/featureFlags';
 
 type LegalView = null | 'privacy' | 'terms';
 
@@ -48,8 +49,7 @@ export function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
-  const [imageFeedback, setImageFeedback] = useState<string | null>(null);
-  const [generatingImage, setGeneratingImage] = useState(false);
+  const [shareCardOpen, setShareCardOpen] = useState(false);
 
   const handleLogout = () => signOut(auth);
 
@@ -96,8 +96,8 @@ export function ProfileScreen() {
     const stats = `${owned}/${total} figuritas (${repeated} repes)`;
     const message = `Estoy completando el album del Mundial 2026: ${stats}. Sumate a CambiaFiguritas para encontrar matches e intercambiar:`;
     const url = user?.uid
-      ? `https://cambiafiguritas.web.app/u/${user.uid}`
-      : 'https://cambiafiguritas.web.app';
+      ? `https://cambiafiguritas.online/u/${user.uid}`
+      : 'https://cambiafiguritas.online';
     const result = await shareText(message, url);
     track({ name: 'share_album_clicked', params: { stats } });
     track({ name: 'og_share_clicked', params: { method: 'profile_link' } });
@@ -113,27 +113,6 @@ export function ProfileScreen() {
     }
   };
 
-  const handleShareImage = async () => {
-    setGeneratingImage(true);
-    setImageFeedback(null);
-    try {
-      const result = await shareStatsImage({
-        userName: user?.name ?? '',
-        owned,
-        total,
-        repeated,
-        missing,
-      });
-      track({ name: 'share_image_generated', params: { result } });
-      if (result === 'shared') setImageFeedback('✓ Compartido');
-      else if (result === 'downloaded') setImageFeedback('✓ Descargado. Subilo a tu story');
-      else if (result === 'unsupported') notify('No disponible', 'Por ahora la imagen sólo se genera en navegador. Probá desde el celular o desktop.');
-      else if (result === 'error') notify('Error', 'No se pudo generar la imagen.');
-    } finally {
-      setGeneratingImage(false);
-      setTimeout(() => setImageFeedback(null), 3000);
-    }
-  };
 
   const handleSave = async () => {
     if (!user) return;
@@ -191,14 +170,14 @@ export function ProfileScreen() {
         )}
         <Text style={styles.name}>{user?.name ?? ''}</Text>
         <Text style={styles.email}>{user?.email ?? ''}</Text>
-        {user?.premium ? (
+        {ENABLE_PREMIUM_UI && user?.premium ? (
           <View style={styles.premiumPill}>
             <Text style={styles.premiumPillText}>✨ Premium activo</Text>
           </View>
         ) : null}
       </View>
 
-      {!user?.premium ? <PremiumCard /> : null}
+      {ENABLE_PREMIUM_UI && !user?.premium ? <PremiumCard /> : null}
 
       <View style={styles.stats}>
         <StatBox label="Obtenidas" value={owned} color={colors.owned} />
@@ -263,17 +242,10 @@ export function ProfileScreen() {
 
       {Platform.OS === 'web' ? (
         <TouchableOpacity
-          style={[styles.shareImageButton, generatingImage && styles.saveButtonDisabled]}
-          onPress={handleShareImage}
-          disabled={generatingImage}
+          style={styles.shareImageButton}
+          onPress={() => setShareCardOpen(true)}
         >
-          {generatingImage ? (
-            <ActivityIndicator color={colors.background} />
-          ) : (
-            <Text style={styles.shareImageButtonText}>
-              {imageFeedback ?? '🖼 Compartir como imagen'}
-            </Text>
-          )}
+          <Text style={styles.shareImageButtonText}>🖼 Compartir figurita</Text>
         </TouchableOpacity>
       ) : null}
 
@@ -346,6 +318,11 @@ export function ProfileScreen() {
         onClose={() => setLegalView(null)}
       />
     </ScrollView>
+
+    <ShareCardModal
+      visible={shareCardOpen}
+      onClose={() => setShareCardOpen(false)}
+    />
     </View>
   );
 }

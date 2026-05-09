@@ -1,6 +1,7 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Linking, Modal, View, StyleSheet } from 'react-native';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
-import type { NavigationContainerRef } from '@react-navigation/native';
+import type { NavigationContainerRef, LinkingOptions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import { colors } from '../constants/theme';
@@ -10,6 +11,7 @@ import { EventsScreen } from '../features/events/EventsScreen';
 import { MatchesNavigator } from '../features/matching/MatchesNavigator';
 import { ProfileScreen } from '../features/profile/ProfileScreen';
 import { RankingsScreen } from '../features/rankings/RankingsScreen';
+import { PublicAlbumScreen } from '../features/share/PublicAlbumScreen';
 import {
   AlbumIcon,
   EventsIcon,
@@ -41,9 +43,45 @@ const TAB_ICONS = {
   Profile: ProfileIcon,
 } as const;
 
+const linking: LinkingOptions<RootTabParamList> = {
+  prefixes: ['cambiafiguritas://', 'https://cambiafiguritas.online'],
+  config: {
+    screens: {
+      Album: 'album',
+      Matches: 'matches',
+      Events: 'eventos',
+      Rankings: 'ranking',
+      Profile: 'perfil',
+    },
+  },
+  getInitialURL: async () => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    const uid = params.get('u');
+    if (uid) return `cambiafiguritas://u/${uid}`;
+    const pathMatch = window.location.pathname.match(/^\/u\/([^/]+)$/);
+    if (pathMatch) return `cambiafiguritas://u/${pathMatch[1]}`;
+    return null;
+  },
+};
+
 export function AppNavigator() {
   const navRef = useRef<NavigationContainerRef<RootTabParamList>>(null);
   const previousRoute = useRef<string | undefined>(undefined);
+  const [publicAlbumUid, setPublicAlbumUid] = useState<string | null>(null);
+
+  const handleDeepLink = (url: string | null) => {
+    if (!url) return;
+    const match = url.match(/\/u\/([a-zA-Z0-9_-]+)/);
+    if (match?.[1]) {
+      setPublicAlbumUid(match[1]);
+    }
+  };
+
+  useEffect(() => {
+    const sub = Linking.addEventListener('url', (event) => handleDeepLink(event.url));
+    return () => sub.remove();
+  }, []);
 
   const onStateChange = () => {
     const current = navRef.current?.getCurrentRoute()?.name;
@@ -54,61 +92,92 @@ export function AppNavigator() {
   };
 
   return (
-    <NavigationContainer
-      ref={navRef}
-      theme={navigationTheme}
-      onReady={onStateChange}
-      onStateChange={onStateChange}
-    >
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          headerShown: false,
-          tabBarActiveTintColor: '#FFD600',
-          tabBarInactiveTintColor: colors.textMuted,
-          tabBarLabelStyle: {
-            fontSize: 11,
-            fontWeight: '700',
-            marginTop: -2,
-          },
-          tabBarStyle: {
-            backgroundColor: colors.surface,
-            borderTopColor: colors.border,
-            paddingTop: 6,
-            paddingBottom: 8,
-            height: 62,
-          },
-          tabBarIcon: ({ focused }) => {
-            const Icon = TAB_ICONS[route.name];
-            return <Icon size={28} active={focused} />;
-          },
-        })}
+    <>
+      <NavigationContainer
+        ref={navRef}
+        theme={navigationTheme}
+        linking={linking}
+        onReady={() => {
+          onStateChange();
+          const initial = linking.getInitialURL?.();
+          if (initial) {
+            Promise.resolve(initial).then((url) => handleDeepLink(url ?? null));
+          }
+        }}
+        onStateChange={onStateChange}
       >
-        <Tab.Screen
-          name="Album"
-          component={AlbumScreen}
-          options={{ title: 'Album' }}
-        />
-        <Tab.Screen
-          name="Matches"
-          component={MatchesNavigator}
-          options={{ title: 'Matches' }}
-        />
-        <Tab.Screen
-          name="Events"
-          component={EventsScreen}
-          options={{ title: 'Eventos' }}
-        />
-        <Tab.Screen
-          name="Rankings"
-          component={RankingsScreen}
-          options={{ title: 'Ranking' }}
-        />
-        <Tab.Screen
-          name="Profile"
-          component={ProfileScreen}
-          options={{ title: 'Perfil' }}
-        />
-      </Tab.Navigator>
-    </NavigationContainer>
+        <Tab.Navigator
+          screenOptions={({ route }) => ({
+            headerShown: false,
+            tabBarActiveTintColor: '#FFD600',
+            tabBarInactiveTintColor: colors.textMuted,
+            tabBarLabelStyle: {
+              fontSize: 11,
+              fontWeight: '700',
+              marginTop: -2,
+            },
+            tabBarStyle: {
+              backgroundColor: colors.surface,
+              borderTopColor: colors.border,
+              paddingTop: 6,
+              paddingBottom: 8,
+              height: 62,
+            },
+            tabBarIcon: ({ focused }) => {
+              const Icon = TAB_ICONS[route.name];
+              return <Icon size={28} active={focused} />;
+            },
+          })}
+        >
+          <Tab.Screen
+            name="Album"
+            component={AlbumScreen}
+            options={{ title: 'Album' }}
+          />
+          <Tab.Screen
+            name="Matches"
+            component={MatchesNavigator}
+            options={{ title: 'Matches' }}
+          />
+          <Tab.Screen
+            name="Events"
+            component={EventsScreen}
+            options={{ title: 'Eventos' }}
+          />
+          <Tab.Screen
+            name="Rankings"
+            component={RankingsScreen}
+            options={{ title: 'Ranking' }}
+          />
+          <Tab.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{ title: 'Perfil' }}
+          />
+        </Tab.Navigator>
+      </NavigationContainer>
+
+      {publicAlbumUid ? (
+        <Modal
+          visible
+          animationType="slide"
+          onRequestClose={() => setPublicAlbumUid(null)}
+        >
+          <View style={styles.modalFull}>
+            <PublicAlbumScreen
+              uid={publicAlbumUid}
+              onExitToApp={() => setPublicAlbumUid(null)}
+            />
+          </View>
+        </Modal>
+      ) : null}
+    </>
   );
 }
+
+const styles = StyleSheet.create({
+  modalFull: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+});

@@ -23,6 +23,7 @@ import {
 import { formatDistance } from '../../utils/distance';
 import { track } from '../../services/analytics';
 import { colors, radii, spacing } from '../../constants/theme';
+import { ENABLE_PREMIUM_UI } from '../../constants/featureFlags';
 
 const FILTER_LABELS: Record<string, string> = {
   mi_ciudad: 'Mi ciudad',
@@ -47,7 +48,7 @@ type Props = { onClose: () => void };
 export function MatchHistoryScreen({ onClose }: Props) {
   const insets = useSafeAreaInsets();
   const user = useUserStore((s) => s.user);
-  const isPremium = user?.premium === true;
+  const isPremium = ENABLE_PREMIUM_UI && user?.premium === true;
   const [batches, setBatches] = useState<MatchBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -187,7 +188,7 @@ function HistoryRow({
           <Text style={styles.name} numberOfLines={1}>
             {entry.name}
           </Text>
-          {entry.premium ? <Text style={styles.premiumStar}>⭐</Text> : null}
+          {ENABLE_PREMIUM_UI && entry.premium ? <Text style={styles.premiumStar}>⭐</Text> : null}
         </View>
         <Text style={styles.subtitle} numberOfLines={1}>
           {subtitleParts.join(' · ') || 'Sin ubicación'}

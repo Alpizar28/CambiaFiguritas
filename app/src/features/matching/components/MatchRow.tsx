@@ -2,6 +2,7 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { Match } from '../../../services/matchingService';
 import { formatDistance } from '../../../utils/distance';
 import { colors, radii, spacing } from '../../../constants/theme';
+import { ENABLE_PREMIUM_UI } from '../../../constants/featureFlags';
 
 type Props = {
   match: Match;
@@ -45,7 +46,7 @@ export function MatchRow({ match, onPress, compact }: Props) {
           <Text style={styles.name} numberOfLines={1}>
             {user.name}
           </Text>
-          {user.premium ? <Text style={styles.premiumStar}>⭐</Text> : null}
+          {ENABLE_PREMIUM_UI && user.premium ? <Text style={styles.premiumStar}>⭐</Text> : null}
           {isVerified ? <Text style={styles.verifiedDot}>✓</Text> : null}
         </View>
         <Text style={styles.subtitle} numberOfLines={1}>
