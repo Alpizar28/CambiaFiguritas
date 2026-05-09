@@ -22,8 +22,7 @@ type Props = {
   onClose: () => void;
 };
 
-const EMPTY_MESSAGE =
-  'No detectamos figuritas. Probá con más luz o acercá la cámara al código.';
+const EMPTY_MESSAGE = 'No detectamos figuritas. Acercá la cámara y mejorá la luz.';
 const ERROR_MESSAGE = 'No pudimos procesar la imagen. Volvé a intentar.';
 
 function getErrorMessage(error: unknown): string {
@@ -44,74 +43,173 @@ function buildCandidates(
   }));
 }
 
+function hasShapeDetection(): boolean {
+  return typeof window !== 'undefined' && 'TextDetector' in window;
+}
+
 export function ScanScreen({ visible, onClose }: Props) {
   const insets = useSafeAreaInsets();
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const detectorRef = useRef<{ detect: (img: HTMLVideoElement | HTMLCanvasElement | ImageBitmap) => Promise<Array<{ rawValue: string }>> } | null>(null);
+  const loopRef = useRef<number | null>(null);
+  const detectingRef = useRef(false);
+
   const [state, setState] = useState<ScanState>({ kind: 'idle' });
-  const inFlight = useRef(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [streamReady, setStreamReady] = useState(false);
+  const [supportsRealtime, setSupportsRealtime] = useState<boolean | null>(null);
+
+  const stopStream = useCallback(() => {
+    if (loopRef.current) {
+      cancelAnimationFrame(loopRef.current);
+      loopRef.current = null;
+    }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setStreamReady(false);
+  }, []);
+
+  const handleDetected = useCallback((rawText: string) => {
+    const blocks = [{ text: rawText, lines: [{ text: rawText }] }];
+    const parsed = parseOCRBlocks(blocks);
+    if (!parsed.length) return false;
+    track({ name: 'scan_recognized', params: { candidates: parsed.length, durationMs: 0 } });
+    const candidates = buildCandidates(parsed);
+    setState({
+      kind: 'review',
+      candidates,
+      selected: new Set(candidates.map((c) => c.stickerId)),
+    });
+    return true;
+  }, []);
+
+  const tickRealtime = useCallback(async () => {
+    if (detectingRef.current) {
+      loopRef.current = requestAnimationFrame(tickRealtime);
+      return;
+    }
+    const detector = detectorRef.current;
+    const video = videoRef.current;
+    if (!detector || !video || video.readyState < 2) {
+      loopRef.current = requestAnimationFrame(tickRealtime);
+      return;
+    }
+    detectingRef.current = true;
+    try {
+      const results = await detector.detect(video);
+      for (const r of results) {
+        if (handleDetected(r.rawValue)) {
+          stopStream();
+          return;
+        }
+      }
+    } catch {
+      // ignore single frame errors
+    } finally {
+      detectingRef.current = false;
+    }
+    loopRef.current = requestAnimationFrame(tickRealtime);
+  }, [handleDetected, stopStream]);
+
+  const startStream = useCallback(async () => {
+    setPermissionDenied(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+      streamRef.current = stream;
+      const video = videoRef.current;
+      if (video) {
+        video.srcObject = stream;
+        video.setAttribute('playsinline', 'true');
+        await video.play().catch(() => {});
+        setStreamReady(true);
+      }
+
+      const realtime = hasShapeDetection();
+      setSupportsRealtime(realtime);
+      if (realtime) {
+        // @ts-expect-error TextDetector is experimental DOM API
+        detectorRef.current = new window.TextDetector();
+        loopRef.current = requestAnimationFrame(tickRealtime);
+      }
+    } catch (error) {
+      const msg = getErrorMessage(error).toLowerCase();
+      if (msg.includes('denied') || msg.includes('not allowed')) {
+        setPermissionDenied(true);
+      } else {
+        setState({ kind: 'error', message: 'No pudimos acceder a la cámara.' });
+      }
+    }
+  }, [tickRealtime]);
 
   useEffect(() => {
-    if (visible) {
-      track({ name: 'scan_opened' });
-    } else {
+    if (!visible) {
+      stopStream();
       setState({ kind: 'idle' });
+      return;
     }
-  }, [visible]);
+    track({ name: 'scan_opened' });
+    startStream();
+    return () => {
+      stopStream();
+    };
+  }, [visible, startStream, stopStream]);
 
   useEffect(() => {
     return () => {
+      stopStream();
       void disposeOcrEngine();
     };
-  }, []);
+  }, [stopStream]);
 
-  const handlePickFile = useCallback((file: File) => {
-    if (inFlight.current) return;
-    inFlight.current = true;
+  const captureFallback = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2) return;
     track({ name: 'scan_capture_started' });
     setState({ kind: 'recognizing' });
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('No canvas context');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, 'image/jpeg', 0.85),
+      );
+      if (!blob) throw new Error('No blob from canvas');
 
-    const start = Date.now();
-    recognizeText(file)
-      .then((blocks) => {
-        const durationMs = Date.now() - start;
-        const parsed = parseOCRBlocks(blocks);
-        track({
-          name: 'scan_recognized',
-          params: { candidates: parsed.length, durationMs },
-        });
-        if (!parsed.length) {
-          track({ name: 'scan_no_match' });
-          setState({ kind: 'empty', message: EMPTY_MESSAGE });
-          return;
-        }
-        const candidates = buildCandidates(parsed);
-        setState({
-          kind: 'review',
-          candidates,
-          selected: new Set(candidates.map((c) => c.stickerId)),
-        });
-      })
-      .catch((error) => {
-        track({
-          name: 'scan_capture_failed',
-          params: { reason: getErrorMessage(error).slice(0, 60) },
-        });
-        setState({ kind: 'error', message: ERROR_MESSAGE });
-      })
-      .finally(() => {
-        inFlight.current = false;
+      const start = Date.now();
+      const blocks = await recognizeText(blob);
+      const durationMs = Date.now() - start;
+      const parsed = parseOCRBlocks(blocks);
+      track({ name: 'scan_recognized', params: { candidates: parsed.length, durationMs } });
+
+      if (!parsed.length) {
+        track({ name: 'scan_no_match' });
+        setState({ kind: 'empty', message: EMPTY_MESSAGE });
+        return;
+      }
+      const candidates = buildCandidates(parsed);
+      setState({
+        kind: 'review',
+        candidates,
+        selected: new Set(candidates.map((c) => c.stickerId)),
       });
-  }, []);
-
-  const triggerCapture = useCallback(() => {
-    inputRef.current?.click();
-  }, []);
-
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handlePickFile(file);
-    e.target.value = '';
-  };
+      stopStream();
+    } catch (error) {
+      track({ name: 'scan_capture_failed', params: { reason: getErrorMessage(error).slice(0, 60) } });
+      setState({ kind: 'error', message: ERROR_MESSAGE });
+    }
+  }, [stopStream]);
 
   const toggleSelected = useCallback((stickerId: string) => {
     setState((prev) => {
@@ -137,11 +235,7 @@ export function ScanScreen({ visible, onClose }: Props) {
         rawText: rawCode,
       };
       if (prev.kind !== 'review') {
-        return {
-          kind: 'review',
-          candidates: [candidate],
-          selected: new Set([sticker.id]),
-        };
+        return { kind: 'review', candidates: [candidate], selected: new Set([sticker.id]) };
       }
       if (prev.candidates.some((c) => c.stickerId === sticker.id)) {
         const nextSelected = new Set(prev.selected);
@@ -184,14 +278,17 @@ export function ScanScreen({ visible, onClose }: Props) {
       if (prev.kind === 'review') track({ name: 'scan_dismissed' });
       return { kind: 'idle' };
     });
-  }, []);
+    startStream();
+  }, [startStream]);
 
   const handleClose = () => {
-    dismiss();
+    stopStream();
+    setState({ kind: 'idle' });
     onClose();
   };
 
   const isBusy = state.kind === 'recognizing';
+  const isReview = state.kind === 'review';
 
   return (
     <Modal
@@ -201,6 +298,27 @@ export function ScanScreen({ visible, onClose }: Props) {
       statusBarTranslucent
     >
       <View style={styles.container}>
+        {/* Live video as RN-rendered HTML element */}
+        {visible && !isReview ? (
+          <video
+            ref={videoRef as never}
+            autoPlay
+            playsInline
+            muted
+            style={
+              {
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                background: '#000',
+              } as never
+            }
+          />
+        ) : null}
+
+        {/* Top bar */}
         <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
           <Pressable
             style={styles.iconButton}
@@ -211,73 +329,85 @@ export function ScanScreen({ visible, onClose }: Props) {
           >
             <Text style={styles.iconText}>✕</Text>
           </Pressable>
-          <Text style={styles.title}>Escanear figurita</Text>
+          <Text style={styles.brand}>Escanear figurita</Text>
           <View style={{ width: 44 }} />
         </View>
 
-        <View style={styles.body}>
-          <View style={styles.illustration}>
-            <Text style={styles.bigIcon}>📷</Text>
+        {permissionDenied ? (
+          <View style={styles.permissionPrompt}>
+            <Text style={styles.permTitle}>Necesitamos la cámara</Text>
+            <Text style={styles.permBody}>
+              Habilitá el permiso desde los ajustes del navegador y volvé a abrir el escáner.
+            </Text>
+            <Pressable style={styles.primaryBtn} onPress={handleClose}>
+              <Text style={styles.primaryBtnText}>Cerrar</Text>
+            </Pressable>
           </View>
-          <Text style={styles.heading}>Sacale una foto al dorso</Text>
-          <Text style={styles.subheading}>
-            Usamos OCR local en tu navegador para detectar el código
-            (ARG17, BRA12, FWC1...). La foto no se sube a ningún lado.
-          </Text>
-
-          {state.kind === 'empty' || state.kind === 'error' ? (
-            <View style={styles.errorCard}>
-              <Text style={styles.errorText}>{state.message}</Text>
+        ) : !isReview ? (
+          <>
+            {/* Frame overlay */}
+            <View style={styles.frameWrapper} pointerEvents="none">
+              <View style={styles.frame} />
+              <Text style={styles.hint}>
+                {supportsRealtime
+                  ? '🎯 Apuntá al código y mantené firme'
+                  : '🎯 Centrá el código y tocá el botón'}
+              </Text>
             </View>
-          ) : null}
 
-          <input
-            ref={inputRef as never}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={onFileChange as never}
-            style={{ display: 'none' } as never}
-          />
+            {/* Bottom bar */}
+            <View
+              style={[
+                styles.bottomBar,
+                { paddingBottom: insets.bottom + spacing.lg },
+              ]}
+            >
+              {state.kind === 'empty' || state.kind === 'error' ? (
+                <View style={styles.errorCard}>
+                  <Text style={styles.errorText}>{state.message}</Text>
+                </View>
+              ) : null}
 
-          <Pressable
-            style={[styles.captureBtn, isBusy && styles.captureBtnDisabled]}
-            onPress={triggerCapture}
-            disabled={isBusy}
-            accessibilityRole="button"
-          >
-            {isBusy ? (
-              <>
-                <ActivityIndicator color={colors.background} />
-                <Text style={styles.captureBtnText}>Procesando…</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.captureIcon}>📸</Text>
-                <Text style={styles.captureBtnText}>Tomar foto</Text>
-              </>
-            )}
-          </Pressable>
+              {!streamReady ? (
+                <View style={styles.loadingCard}>
+                  <ActivityIndicator color={colors.text} />
+                  <Text style={styles.loadingText}>Encendiendo cámara…</Text>
+                </View>
+              ) : supportsRealtime ? (
+                <View style={styles.realtimeBadge}>
+                  <View style={styles.dotPulse} />
+                  <Text style={styles.realtimeText}>Detectando código…</Text>
+                </View>
+              ) : (
+                <Pressable
+                  style={[styles.captureBtn, isBusy && styles.captureBtnDisabled]}
+                  onPress={captureFallback}
+                  disabled={isBusy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Capturar"
+                >
+                  {isBusy ? (
+                    <ActivityIndicator color={colors.background} />
+                  ) : (
+                    <View style={styles.captureInner} />
+                  )}
+                </Pressable>
+              )}
 
-          <Pressable
-            style={styles.secondaryBtn}
-            onPress={() =>
-              setState({ kind: 'review', candidates: [], selected: new Set() })
-            }
-            accessibilityRole="button"
-          >
-            <Text style={styles.secondaryBtnText}>O ingresá el código manual</Text>
-          </Pressable>
+              <Pressable
+                style={styles.manualToggle}
+                onPress={() =>
+                  setState({ kind: 'review', candidates: [], selected: new Set() })
+                }
+                accessibilityRole="button"
+              >
+                <Text style={styles.manualToggleText}>O ingresá el código manual</Text>
+              </Pressable>
+            </View>
+          </>
+        ) : null}
 
-          <View style={styles.tipsBox}>
-            <Text style={styles.tipsTitle}>💡 Para mejor detección</Text>
-            <Text style={styles.tipText}>· Buena luz, sin reflejos</Text>
-            <Text style={styles.tipText}>· Acercá hasta llenar la foto</Text>
-            <Text style={styles.tipText}>· El código tiene que estar nítido</Text>
-          </View>
-        </View>
-
-        {state.kind === 'review' ? (
+        {isReview && state.kind === 'review' ? (
           <ScanResultSheet
             visible
             candidates={state.candidates}
@@ -296,7 +426,7 @@ export function ScanScreen({ visible, onClose }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#000',
   },
   topBar: {
     flexDirection: 'row',
@@ -304,13 +434,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  title: {
-    color: colors.text,
-    fontSize: 17,
-    fontWeight: '700',
+    zIndex: 5,
   },
   iconButton: {
     width: 44,
@@ -318,114 +442,162 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.card,
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
   iconText: {
     color: colors.text,
     fontSize: 18,
     fontWeight: '600',
   },
-  body: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    alignItems: 'center',
+  brand: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.sm,
   },
-  illustration: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.card,
+  frameWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.lg,
-    borderWidth: 2,
+  },
+  frame: {
+    width: '85%',
+    aspectRatio: 1.4,
+    borderWidth: 4,
     borderColor: colors.accent,
+    borderRadius: radii.md,
+    backgroundColor: 'transparent',
   },
-  bigIcon: {
-    fontSize: 56,
-  },
-  heading: {
+  hint: {
+    marginTop: spacing.lg,
     color: colors.text,
-    fontSize: 22,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-  },
-  subheading: {
-    color: colors.textMuted,
     fontSize: 14,
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: spacing.xl,
-    maxWidth: 320,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.sm,
+  },
+  bottomBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    paddingTop: spacing.md,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  loadingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+  loadingText: {
+    color: colors.text,
+    fontSize: 14,
+  },
+  realtimeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: 'rgba(0, 200, 83, 0.2)',
+    borderColor: 'rgba(0, 200, 83, 0.6)',
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.lg,
+    marginVertical: spacing.md,
+  },
+  dotPulse: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.primary,
+  },
+  realtimeText: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  captureBtn: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    backgroundColor: colors.text,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 4,
+    borderColor: 'rgba(255,255,255,0.4)',
+    marginVertical: spacing.md,
+  },
+  captureBtnDisabled: {
+    opacity: 0.6,
+  },
+  captureInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.accent,
+  },
+  manualToggle: {
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  manualToggleText: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: '600',
   },
   errorCard: {
-    backgroundColor: 'rgba(255,23,68,0.18)',
+    backgroundColor: 'rgba(255,23,68,0.85)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: radii.sm,
-    padding: spacing.md,
     marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255,23,68,0.5)',
+    maxWidth: 320,
   },
   errorText: {
     color: colors.text,
     fontSize: 13,
     textAlign: 'center',
   },
-  captureBtn: {
-    backgroundColor: colors.accent,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md + 2,
-    borderRadius: radii.lg,
-    flexDirection: 'row',
+  permissionPrompt: {
+    flex: 1,
     alignItems: 'center',
-    gap: spacing.sm,
-    minWidth: 240,
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    paddingHorizontal: spacing.xl,
   },
-  captureBtnDisabled: {
-    opacity: 0.6,
-  },
-  captureIcon: {
-    fontSize: 22,
-  },
-  captureBtnText: {
-    color: colors.background,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  secondaryBtn: {
-    paddingVertical: spacing.md,
-    marginTop: spacing.sm,
-  },
-  secondaryBtnText: {
-    color: colors.secondary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  tipsBox: {
-    marginTop: spacing.xl,
-    backgroundColor: colors.card,
-    padding: spacing.md,
-    borderRadius: radii.sm,
-    width: '100%',
-    maxWidth: 360,
-  },
-  tipsTitle: {
+  permTitle: {
     color: colors.text,
-    fontSize: 13,
+    fontSize: 22,
     fontWeight: '700',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
   },
-  tipText: {
+  permBody: {
     color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: spacing.lg,
+  },
+  primaryBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
+  },
+  primaryBtnText: {
+    color: colors.background,
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
