@@ -119,6 +119,11 @@ export function ScanResultSheet({
                 <Text style={styles.itemMeta} numberOfLines={1}>
                   {describeStatus(candidate)}  ·  {describeAction(candidate)}
                 </Text>
+                {candidate.rawText && candidate.rawText !== candidate.sticker.displayCode ? (
+                  <Text style={styles.itemRaw} numberOfLines={1}>
+                    OCR leyó: "{candidate.rawText}"
+                  </Text>
+                ) : null}
               </View>
             </Pressable>
           );
@@ -256,6 +261,13 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     marginTop: 2,
+  },
+  itemRaw: {
+    color: colors.textMuted,
+    fontSize: 11,
+    marginTop: 2,
+    fontStyle: 'italic',
+    opacity: 0.7,
   },
   manualToggle: {
     paddingVertical: spacing.sm,

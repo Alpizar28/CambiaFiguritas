@@ -43,15 +43,10 @@ function buildCandidates(
   }));
 }
 
-function hasShapeDetection(): boolean {
-  return typeof window !== 'undefined' && 'TextDetector' in window;
-}
-
 export function ScanScreen({ visible, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const detectorRef = useRef<{ detect: (img: HTMLVideoElement | HTMLCanvasElement | ImageBitmap) => Promise<Array<{ rawValue: string }>> } | null>(null);
   const loopRef = useRef<number | null>(null);
   const detectingRef = useRef(false);
 
@@ -62,7 +57,7 @@ export function ScanScreen({ visible, onClose }: Props) {
 
   const stopStream = useCallback(() => {
     if (loopRef.current) {
-      cancelAnimationFrame(loopRef.current);
+      window.clearInterval(loopRef.current);
       loopRef.current = null;
     }
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -71,47 +66,59 @@ export function ScanScreen({ visible, onClose }: Props) {
     setStreamReady(false);
   }, []);
 
-  const handleDetected = useCallback((rawText: string) => {
-    const blocks = [{ text: rawText, lines: [{ text: rawText }] }];
-    const parsed = parseOCRBlocks(blocks);
-    if (!parsed.length) return false;
-    track({ name: 'scan_recognized', params: { candidates: parsed.length, durationMs: 0 } });
-    const candidates = buildCandidates(parsed);
-    setState({
-      kind: 'review',
-      candidates,
-      selected: new Set(candidates.map((c) => c.stickerId)),
-    });
-    return true;
+  // Crops the central area of the video matching the on-screen yellow frame
+  // (85% width × aspect 1.4) and returns a JPEG blob for OCR.
+  const cropFrameToBlob = useCallback(async (): Promise<Blob | null> => {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2) return null;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if (!vw || !vh) return null;
+
+    // Frame: 85% of viewport width × aspect 1.4. We crop the matching center
+    // region in video coordinates (assuming objectFit:cover scales uniformly).
+    const cropW = vw * 0.85;
+    const cropH = cropW / 1.4;
+    const cropX = (vw - cropW) / 2;
+    const cropY = (vh - cropH) / 2;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(cropW);
+    canvas.height = Math.round(cropH);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+    return await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.85),
+    );
   }, []);
 
   const tickRealtime = useCallback(async () => {
-    if (detectingRef.current) {
-      loopRef.current = requestAnimationFrame(tickRealtime);
-      return;
-    }
-    const detector = detectorRef.current;
+    if (detectingRef.current) return;
     const video = videoRef.current;
-    if (!detector || !video || video.readyState < 2) {
-      loopRef.current = requestAnimationFrame(tickRealtime);
-      return;
-    }
+    if (!video || video.readyState < 2) return;
     detectingRef.current = true;
     try {
-      const results = await detector.detect(video);
-      for (const r of results) {
-        if (handleDetected(r.rawValue)) {
-          stopStream();
-          return;
-        }
+      const blob = await cropFrameToBlob();
+      if (!blob) return;
+      const blocks = await recognizeText(blob);
+      const parsed = parseOCRBlocks(blocks);
+      if (parsed.length) {
+        track({ name: 'scan_recognized', params: { candidates: parsed.length, durationMs: 0 } });
+        const candidates = buildCandidates(parsed);
+        setState({
+          kind: 'review',
+          candidates,
+          selected: new Set(candidates.map((c) => c.stickerId)),
+        });
+        stopStream();
       }
-    } catch {
-      // ignore single frame errors
+    } catch (err) {
+      console.warn('[scan] tick error', err);
     } finally {
       detectingRef.current = false;
     }
-    loopRef.current = requestAnimationFrame(tickRealtime);
-  }, [handleDetected, stopStream]);
+  }, [cropFrameToBlob, stopStream]);
 
   const startStream = useCallback(async () => {
     setPermissionDenied(false);
@@ -157,18 +164,12 @@ export function ScanScreen({ visible, onClose }: Props) {
         setStreamReady(true);
       }
 
-      const realtime = hasShapeDetection();
-      setSupportsRealtime(realtime);
-      if (realtime) {
-        try {
-          // @ts-expect-error TextDetector is experimental DOM API
-          detectorRef.current = new window.TextDetector();
-          loopRef.current = requestAnimationFrame(tickRealtime);
-        } catch (err) {
-          console.warn('[scan] TextDetector init failed', err);
-          setSupportsRealtime(false);
-        }
-      }
+      // Realtime con Tesseract.js throttled. Worker se carga on-demand
+      // en el primer tick (toma ~3-4 seg primera vez, instantáneo después).
+      setSupportsRealtime(true);
+      loopRef.current = window.setInterval(() => {
+        void tickRealtime();
+      }, 1800);
     } catch (error) {
       const msg = getErrorMessage(error).toLowerCase();
       console.error('[scan] getUserMedia error', error);

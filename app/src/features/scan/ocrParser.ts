@@ -17,15 +17,25 @@ function basicNormalize(raw: string): string {
   return raw.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9]/g, '');
 }
 
+// OCR commonly confuses these characters when the token is "letters then digits".
+// We only fix DIGIT positions (suffix after the 3-letter prefix), never the prefix.
 function fixOCRConfusables(token: string): string {
-  return token
-    .replace(/(\d)O(\d)/g, '$10$2')
-    .replace(/(\d)O$/g, '$10')
-    .replace(/^O(\d)/g, '0$1')
-    .replace(/(\d)I/g, '$11')
-    .replace(/I(\d)/g, '1$1')
-    .replace(/(\d)L/g, '$11')
-    .replace(/L(\d)/g, '1$1');
+  // Match prefix (3-4 letters) + suffix (rest)
+  const m = token.match(/^([A-Z]{3,4})(.+)$/);
+  if (!m) return token;
+  const [, prefix, suffix] = m;
+  const digitsOnly = suffix
+    .replace(/O/g, '0')
+    .replace(/Q/g, '0')
+    .replace(/D/g, '0')
+    .replace(/I/g, '1')
+    .replace(/L/g, '1')
+    .replace(/T/g, '7')
+    .replace(/Z/g, '2')
+    .replace(/S/g, '5')
+    .replace(/B/g, '8')
+    .replace(/G/g, '6');
+  return prefix + digitsOnly;
 }
 
 function lookupSticker(internalId: string): Sticker | null {

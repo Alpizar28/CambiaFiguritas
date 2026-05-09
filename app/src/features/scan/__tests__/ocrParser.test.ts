@@ -62,6 +62,30 @@ test('parseToken normalizes O->0 in slot number ("ARG1O" -> ARG10)', () => {
   assert.equal(r?.stickerId, 'ARG10');
 });
 
+test('parseToken normalizes S->5 in suffix ("MEXS" -> MEX5)', () => {
+  const r = parseToken('MEXS', 'MEXS', 0.9);
+  assert.ok(r);
+  assert.equal(r?.stickerId, 'MEX5');
+});
+
+test('parseToken normalizes B->8 in suffix ("BRAB" -> BRA8)', () => {
+  const r = parseToken('BRAB', 'BRAB', 0.9);
+  assert.ok(r);
+  assert.equal(r?.stickerId, 'BRA8');
+});
+
+test('parseToken normalizes Z->2 in suffix ("ARGZ" -> ARG2)', () => {
+  const r = parseToken('ARGZ', 'ARGZ', 0.9);
+  assert.ok(r);
+  assert.equal(r?.stickerId, 'ARG2');
+});
+
+test('parseToken does NOT mangle valid prefix letters (BRA17 stays BRA17)', () => {
+  const r = parseToken('BRA17', 'BRA17', 0.9);
+  assert.ok(r);
+  assert.equal(r?.stickerId, 'BRA17');
+});
+
 test('parseToken rejects unknown country code (8RA17 stays unmapped)', () => {
   // 8 doesn't normalize, prefix invalid
   const r = parseToken('8RA17', '8RA17', 0.9);
