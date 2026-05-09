@@ -102,7 +102,15 @@ type AnalyticsEvent =
   | { name: 'match_share_clicked'; params: { isPerfectTrade: boolean; matchUid: string } }
   | { name: 'matches_referral_shared'; params: { uid: string } }
   | { name: 'onboarding_invite_shown' }
-  | { name: 'onboarding_invite_clicked' };
+  | { name: 'onboarding_invite_clicked' }
+  | { name: 'scan_opened' }
+  | { name: 'scan_capture_started' }
+  | { name: 'scan_capture_failed'; params: { reason: string } }
+  | { name: 'scan_recognized'; params: { candidates: number; durationMs: number } }
+  | { name: 'scan_no_match' }
+  | { name: 'scan_confirmed'; params: { added: number; incremented: number } }
+  | { name: 'scan_dismissed' }
+  | { name: 'scan_manual_entry'; params: { matched: boolean } };
 
 let analyticsInstance: Analytics | null = null;
 let initPromise: Promise<Analytics | null> | null = null;

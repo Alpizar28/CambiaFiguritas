@@ -17,7 +17,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.cambiafiguritas.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para mostrarte usuarios cercanos con quienes intercambiar figuritas."
+        "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para mostrarte usuarios cercanos con quienes intercambiar figuritas.",
+        "NSCameraUsageDescription": "CambiaFiguritas usa la cámara para escanear códigos de figuritas. Las fotos no se guardan ni se envían."
       }
     },
     "android": {
@@ -32,7 +33,8 @@
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "INTERNET"
+        "INTERNET",
+        "CAMERA"
       ]
     },
     "web": {
@@ -45,6 +47,14 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "Usamos tu ubicación para mostrarte usuarios cercanos con quienes intercambiar figuritas."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "CambiaFiguritas usa la cámara para escanear códigos de figuritas. Las fotos no se guardan ni se envían.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
       ],
       [

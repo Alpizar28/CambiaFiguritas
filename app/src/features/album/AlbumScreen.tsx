@@ -26,6 +26,8 @@ import { Tooltip } from '../../components/Tooltip';
 import { useUserStore } from '../../store/userStore';
 
 import { ShareCardModal } from '../profile/components/ShareCardModal';
+import { ScanFab } from '../../components/ScanFab';
+import { ScanScreen } from '../scan/ScanScreen';
 import type { AlbumSlot, CountryAlbumPage, Sticker, StickerStatus } from './types';
 import { fuzzyContains } from './utils/fuzzyMatch';
 
@@ -105,6 +107,7 @@ export function AlbumScreen() {
   const isDesktop = width >= 900;
   const uid = useUserStore((s) => s.user?.uid);
   const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
 
   const [activeGroupIndex, setActiveGroupIndex] = useState(0);
   const [activeCountryPage, setActiveCountryPage] = useState<1 | 2>(1);
@@ -539,6 +542,8 @@ export function AlbumScreen() {
           onClose={closeSheet}
         />
       <ShareCardModal visible={shareModalOpen} onClose={() => setShareModalOpen(false)} />
+      <ScanFab onPress={() => setScanOpen(true)} />
+      <ScanScreen visible={scanOpen} onClose={() => setScanOpen(false)} />
       </View>
     );
   }
@@ -712,6 +717,8 @@ export function AlbumScreen() {
         </View>
       </ScrollView>
       <ShareCardModal visible={shareModalOpen} onClose={() => setShareModalOpen(false)} />
+      <ScanFab onPress={() => setScanOpen(true)} />
+      <ScanScreen visible={scanOpen} onClose={() => setScanOpen(false)} />
     </View>
   );
 }
