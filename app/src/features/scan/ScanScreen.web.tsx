@@ -115,6 +115,13 @@ export function ScanScreen({ visible, onClose }: Props) {
 
   const startStream = useCallback(async () => {
     setPermissionDenied(false);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setState({
+        kind: 'error',
+        message: 'Tu navegador no soporta cámara. Probá Chrome o Safari.',
+      });
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -126,26 +133,51 @@ export function ScanScreen({ visible, onClose }: Props) {
       });
       streamRef.current = stream;
       const video = videoRef.current;
-      if (video) {
+      if (!video) {
+        // Video not yet mounted; retry once
+        setTimeout(() => {
+          const v = videoRef.current;
+          if (v) {
+            v.srcObject = stream;
+            v.setAttribute('playsinline', 'true');
+            v.play().then(() => setStreamReady(true)).catch((err) => {
+              console.warn('[scan] video.play() failed', err);
+              setStreamReady(true); // Show anyway, user can interact
+            });
+          }
+        }, 100);
+      } else {
         video.srcObject = stream;
         video.setAttribute('playsinline', 'true');
-        await video.play().catch(() => {});
+        try {
+          await video.play();
+        } catch (err) {
+          console.warn('[scan] video.play() failed', err);
+        }
         setStreamReady(true);
       }
 
       const realtime = hasShapeDetection();
       setSupportsRealtime(realtime);
       if (realtime) {
-        // @ts-expect-error TextDetector is experimental DOM API
-        detectorRef.current = new window.TextDetector();
-        loopRef.current = requestAnimationFrame(tickRealtime);
+        try {
+          // @ts-expect-error TextDetector is experimental DOM API
+          detectorRef.current = new window.TextDetector();
+          loopRef.current = requestAnimationFrame(tickRealtime);
+        } catch (err) {
+          console.warn('[scan] TextDetector init failed', err);
+          setSupportsRealtime(false);
+        }
       }
     } catch (error) {
       const msg = getErrorMessage(error).toLowerCase();
-      if (msg.includes('denied') || msg.includes('not allowed')) {
+      console.error('[scan] getUserMedia error', error);
+      if (msg.includes('denied') || msg.includes('not allowed') || msg.includes('permission')) {
         setPermissionDenied(true);
+      } else if (msg.includes('not found') || msg.includes('overconstrained')) {
+        setState({ kind: 'error', message: 'No encontramos cámara trasera. Probá con la frontal.' });
       } else {
-        setState({ kind: 'error', message: 'No pudimos acceder a la cámara.' });
+        setState({ kind: 'error', message: `Error cámara: ${msg.slice(0, 80)}` });
       }
     }
   }, [tickRealtime]);
@@ -157,8 +189,12 @@ export function ScanScreen({ visible, onClose }: Props) {
       return;
     }
     track({ name: 'scan_opened' });
-    startStream();
+    // Espera a que el video esté en el DOM antes de attach stream
+    const id = window.setTimeout(() => {
+      startStream();
+    }, 60);
     return () => {
+      window.clearTimeout(id);
       stopStream();
     };
   }, [visible, startStream, stopStream]);
@@ -298,8 +334,8 @@ export function ScanScreen({ visible, onClose }: Props) {
       statusBarTranslucent
     >
       <View style={styles.container}>
-        {/* Live video as RN-rendered HTML element */}
-        {visible && !isReview ? (
+        {/* Live video — always mounted while modal visible. Hidden via display when reviewing. */}
+        {visible ? (
           <video
             ref={videoRef as never}
             autoPlay
@@ -308,11 +344,14 @@ export function ScanScreen({ visible, onClose }: Props) {
             style={
               {
                 position: 'absolute',
-                inset: 0,
+                top: 0,
+                left: 0,
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
-                background: '#000',
+                backgroundColor: '#000',
+                display: isReview ? 'none' : 'block',
+                zIndex: 0,
               } as never
             }
           />

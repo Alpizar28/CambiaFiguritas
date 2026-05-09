@@ -1,12 +1,33 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import type { StickerStatus, StickerStatusMap } from '../features/album/types';
 
-type AlbumSnapshot = {
+export type AlbumSnapshot = {
   statuses: Record<string, StickerStatus>;
   repeatedCounts: Record<string, number>;
   wishlist?: Record<string, true>;
+  updatedAt?: number;
 };
+
+export function subscribeUserAlbum(
+  uid: string,
+  onChange: (snapshot: AlbumSnapshot | null) => void,
+): () => void {
+  const ref = doc(db, 'userAlbums', uid);
+  return onSnapshot(
+    ref,
+    (snap) => {
+      if (!snap.exists()) {
+        onChange(null);
+        return;
+      }
+      onChange(snap.data() as AlbumSnapshot);
+    },
+    (error) => {
+      console.error('[albumSync] subscribe error', error);
+    },
+  );
+}
 
 export async function loadUserAlbum(uid: string): Promise<AlbumSnapshot | null> {
   const ref = doc(db, 'userAlbums', uid);
