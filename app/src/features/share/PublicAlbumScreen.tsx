@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Linking,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { fetchPublicAlbum, type PublicAlbumPayload, type PublicAlbumStatus } from '../../services/publicAlbumService';
 import {
@@ -66,44 +67,91 @@ function GroupBlock({
   summary,
   statuses,
   repeatedCounts,
+  collapsed,
+  onToggle,
 }: {
   summary: GroupSummary;
   statuses: Record<string, PublicAlbumStatus>;
   repeatedCounts: Record<string, number>;
+  collapsed: boolean;
+  onToggle: () => void;
 }) {
   const pct = summary.total === 0 ? 0 : Math.round((summary.owned / summary.total) * 100);
+  const isEmpty = summary.owned === 0;
+  const subtitle = isEmpty
+    ? `Sin figuritas · 0/${summary.total}`
+    : `${summary.group.country.group} · ${summary.owned}/${summary.total} (${pct}%)`;
+
   return (
     <View style={styles.groupBlock}>
-      <View style={styles.groupHeader}>
+      <TouchableOpacity
+        style={styles.groupHeader}
+        onPress={onToggle}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`${summary.group.country.name}, ${collapsed ? 'expandir' : 'contraer'}`}
+      >
         <View style={{ flex: 1 }}>
           <Text style={styles.groupTitle}>{summary.group.country.name}</Text>
-          <Text style={styles.groupSubtitle}>
-            {summary.group.country.group} · {summary.owned}/{summary.total} ({pct}%)
-          </Text>
+          <Text style={styles.groupSubtitle}>{subtitle}</Text>
         </View>
         {summary.owned === summary.total && summary.total > 0 ? (
           <View style={styles.completeBadge}>
             <Text style={styles.completeBadgeText}>✓</Text>
           </View>
         ) : null}
-      </View>
-      <View style={styles.grid}>
-        {summary.group.stickers.map((s) => {
-          const status = statuses[s.id] ?? 'missing';
-          const reps = repeatedCounts[s.id];
-          return (
-            <View key={s.id} style={styles.cell}>
-              <StickerDot status={status} />
-              <Text style={styles.cellLabel} numberOfLines={1}>
-                {s.displayCode}
-              </Text>
-              {status === 'repeated' && reps && reps > 1 ? (
-                <Text style={styles.repeatedTag}>×{reps}</Text>
-              ) : null}
-            </View>
-          );
-        })}
-      </View>
+        <Text style={styles.chevron}>{collapsed ? '▶' : '▼'}</Text>
+      </TouchableOpacity>
+      {!collapsed ? (
+        <View style={styles.grid}>
+          {summary.group.stickers.map((s) => {
+            const status = statuses[s.id] ?? 'missing';
+            const reps = repeatedCounts[s.id];
+            return (
+              <View key={s.id} style={styles.cell}>
+                <StickerDot status={status} />
+                <Text style={styles.cellLabel} numberOfLines={1}>
+                  {s.displayCode}
+                </Text>
+                {status === 'repeated' && reps && reps > 1 ? (
+                  <Text style={styles.repeatedTag}>×{reps}</Text>
+                ) : null}
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function TopBar({ onBack }: { onBack: () => void }) {
+  return (
+    <View style={styles.topBar}>
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={onBack}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        accessibilityRole="button"
+        accessibilityLabel="Volver"
+      >
+        <Text style={styles.backChevron}>‹</Text>
+        <Text style={styles.backText}>Volver</Text>
+      </TouchableOpacity>
+      <Text style={styles.brand}>cambiafiguritas.online</Text>
+    </View>
+  );
+}
+
+function StickyCta({ onPress }: { onPress: () => void }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.stickyBar, { paddingBottom: spacing.md + insets.bottom }]}>
+      <TouchableOpacity style={styles.stickyButton} onPress={onPress} activeOpacity={0.85}>
+        <Text style={styles.stickyEmoji}>⚽</Text>
+        <Text style={styles.stickyButtonText}>Crear mi álbum gratis</Text>
+        <Text style={styles.stickyArrow}>→</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -112,6 +160,7 @@ export function PublicAlbumScreen({ uid, onExitToApp }: Props) {
   const [data, setData] = useState<PublicAlbumPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -141,22 +190,55 @@ export function PublicAlbumScreen({ uid, onExitToApp }: Props) {
     return summarize(all, data.album.statuses);
   }, [data]);
 
+  useEffect(() => {
+    if (!summaries.length) return;
+    const init: Record<string, boolean> = {};
+    for (const s of summaries) {
+      init[s.group.country.id] = s.owned === 0;
+    }
+    setCollapsed(init);
+  }, [summaries]);
+
+  const allCollapsed = useMemo(() => {
+    if (!summaries.length) return false;
+    return summaries.every((s) => collapsed[s.group.country.id]);
+  }, [collapsed, summaries]);
+
+  const toggleAll = () => {
+    const next = !allCollapsed;
+    setCollapsed(Object.fromEntries(summaries.map((s) => [s.group.country.id, next])));
+  };
+
+  const toggleOne = (id: string) => {
+    setCollapsed((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleCtaPress = () => {
+    Linking.openURL(APP_URL).catch(() => undefined);
+    onExitToApp();
+  };
+
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={styles.root}>
+        <TopBar onBack={onExitToApp} />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+        <StickyCta onPress={handleCtaPress} />
       </View>
     );
   }
 
   if (error || !data) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorTitle}>Álbum no disponible</Text>
-        <Text style={styles.errorMsg}>{error ?? 'Usuario no encontrado.'}</Text>
-        <TouchableOpacity style={styles.cta} onPress={onExitToApp}>
-          <Text style={styles.ctaText}>Ir a CambiaFiguritas</Text>
-        </TouchableOpacity>
+      <View style={styles.root}>
+        <TopBar onBack={onExitToApp} />
+        <View style={styles.center}>
+          <Text style={styles.errorTitle}>Álbum no disponible</Text>
+          <Text style={styles.errorMsg}>{error ?? 'Usuario no encontrado.'}</Text>
+        </View>
+        <StickyCta onPress={handleCtaPress} />
       </View>
     );
   }
@@ -166,76 +248,84 @@ export function PublicAlbumScreen({ uid, onExitToApp }: Props) {
   const isHidden = data.album.hideProgress === true;
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        {data.user.photoUrl ? (
-          <Image source={{ uri: data.user.photoUrl }} style={styles.avatar} />
-        ) : (
-          <View style={[styles.avatar, styles.avatarFallback]}>
-            <Text style={styles.avatarFallbackText}>
-              {(data.user.name[0] ?? '?').toUpperCase()}
+    <View style={styles.root}>
+      <TopBar onBack={onExitToApp} />
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          {data.user.photoUrl ? (
+            <Image source={{ uri: data.user.photoUrl }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarFallback]}>
+              <Text style={styles.avatarFallbackText}>
+                {(data.user.name[0] ?? '?').toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name}>{data.user.name}</Text>
+            {data.user.city ? <Text style={styles.city}>{data.user.city}</Text> : null}
+            {isHidden ? (
+              <Text style={styles.headerStats}>Progreso privado</Text>
+            ) : (
+              <>
+                <Text style={styles.headerStats}>
+                  {data.album.ownedCount} obtenidas
+                  {data.album.repeatedCount > 0 ? ` · ${data.album.repeatedCount} repetidas` : ''}
+                </Text>
+                <Text style={styles.pct}>{pct}% del álbum</Text>
+              </>
+            )}
+          </View>
+        </View>
+
+        {isHidden ? (
+          <View style={styles.privateBlock}>
+            <Text style={styles.privateTitle}>🔒 Progreso oculto</Text>
+            <Text style={styles.privateBody}>
+              {data.user.name} eligió no mostrar su álbum públicamente. Sumate a CambiaFiguritas
+              para conectar y proponer intercambios.
             </Text>
           </View>
+        ) : (
+          <>
+            <View style={styles.controlsRow}>
+              <View style={styles.legend}>
+                <LegendItem color={colors.owned} label="Obtenida" />
+                {!data.album.hideRepeated ? (
+                  <LegendItem color={colors.repeated} label="Repetida" />
+                ) : null}
+                <LegendItem color={colors.special} label="Especial" />
+                <LegendItem color={colors.missing} label="Falta" />
+              </View>
+              <TouchableOpacity
+                onPress={toggleAll}
+                style={styles.toggleAllButton}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+              >
+                <Text style={styles.toggleAllText}>
+                  {allCollapsed ? 'Expandir todo' : 'Contraer todo'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {summaries.map((s) => (
+              <GroupBlock
+                key={s.group.country.id}
+                summary={s}
+                statuses={data.album.statuses}
+                repeatedCounts={data.album.repeatedCounts}
+                collapsed={collapsed[s.group.country.id] ?? s.owned === 0}
+                onToggle={() => toggleOne(s.group.country.id)}
+              />
+            ))}
+          </>
         )}
-        <View style={{ flex: 1 }}>
-          <Text style={styles.name}>{data.user.name}</Text>
-          {data.user.city ? <Text style={styles.city}>{data.user.city}</Text> : null}
-          {isHidden ? (
-            <Text style={styles.headerStats}>Progreso privado</Text>
-          ) : (
-            <>
-              <Text style={styles.headerStats}>
-                {data.album.ownedCount} obtenidas
-                {data.album.repeatedCount > 0 ? ` · ${data.album.repeatedCount} repetidas` : ''}
-              </Text>
-              <Text style={styles.pct}>{pct}% del álbum</Text>
-            </>
-          )}
-        </View>
-      </View>
 
-      {isHidden ? (
-        <View style={styles.privateBlock}>
-          <Text style={styles.privateTitle}>🔒 Progreso oculto</Text>
-          <Text style={styles.privateBody}>
-            {data.user.name} eligió no mostrar su álbum públicamente. Sumate a CambiaFiguritas
-            para conectar y proponer intercambios.
-          </Text>
-        </View>
-      ) : (
-        <>
-          <View style={styles.legend}>
-            <LegendItem color={colors.owned} label="Obtenida" />
-            {!data.album.hideRepeated ? (
-              <LegendItem color={colors.repeated} label="Repetida" />
-            ) : null}
-            <LegendItem color={colors.special} label="Especial" />
-            <LegendItem color={colors.missing} label="Falta" />
-          </View>
-
-          {summaries.map((s) => (
-            <GroupBlock
-              key={s.group.country.id}
-              summary={s}
-              statuses={data.album.statuses}
-              repeatedCounts={data.album.repeatedCounts}
-            />
-          ))}
-        </>
-      )}
-
-      <TouchableOpacity
-        style={styles.cta}
-        onPress={() => {
-          Linking.openURL(APP_URL).catch(() => undefined);
-          onExitToApp();
-        }}
-      >
-        <Text style={styles.ctaText}>Crear mi álbum gratis</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.footer}>cambiafiguritas.online</Text>
-    </ScrollView>
+        <Text style={styles.footer}>cambiafiguritas.online</Text>
+      </ScrollView>
+      <StickyCta onPress={handleCtaPress} />
+    </View>
   );
 }
 
@@ -250,7 +340,34 @@ function LegendItem({ color, label }: { color: string; label: string }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.md, paddingBottom: spacing.xl * 2 },
+  scroll: { flex: 1 },
+  content: { padding: spacing.md, paddingBottom: spacing.lg },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    paddingRight: spacing.sm,
+    minHeight: 44,
+  },
+  backChevron: {
+    color: colors.text,
+    fontSize: 28,
+    lineHeight: 28,
+    marginRight: 6,
+    fontWeight: '600',
+  },
+  backText: { color: colors.text, fontSize: 16, fontWeight: '600' },
+  brand: { color: colors.textMuted, fontSize: 12 },
   center: {
     flex: 1,
     backgroundColor: colors.background,
@@ -288,15 +405,36 @@ const styles = StyleSheet.create({
   city: { color: colors.textMuted, fontSize: 14 },
   headerStats: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
   pct: { color: colors.accent, fontSize: 16, fontWeight: '800', marginTop: 4 },
-  legend: {
+  controlsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
+  legend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    flex: 1,
+  },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 12, height: 12, borderRadius: 6 },
   legendLabel: { color: colors.textMuted, fontSize: 12 },
+  toggleAllButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  toggleAllText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   groupBlock: {
     backgroundColor: colors.card,
     borderRadius: radii.md,
@@ -308,10 +446,17 @@ const styles = StyleSheet.create({
   groupHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    gap: spacing.sm,
   },
   groupTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   groupSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+  chevron: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: '700',
+    width: 20,
+    textAlign: 'center',
+  },
   completeBadge: {
     width: 28,
     height: 28,
@@ -325,6 +470,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
+    marginTop: spacing.sm,
   },
   cell: {
     width: 56,
@@ -373,14 +519,26 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     textAlign: 'center',
   },
-  cta: {
+  stickyBar: {
+    backgroundColor: colors.background,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+  },
+  stickyButton: {
     backgroundColor: colors.accent,
     borderRadius: radii.md,
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.md,
+    justifyContent: 'center',
+    gap: spacing.sm,
   },
-  ctaText: { color: '#000', fontSize: 16, fontWeight: '800' },
+  stickyEmoji: { fontSize: 20 },
+  stickyButtonText: { color: '#000', fontSize: 16, fontWeight: '800' },
+  stickyArrow: { color: '#000', fontSize: 18, fontWeight: '800' },
   footer: {
     color: colors.textMuted,
     fontSize: 12,
