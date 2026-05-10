@@ -110,7 +110,13 @@ type AnalyticsEvent =
   | { name: 'scan_no_match' }
   | { name: 'scan_confirmed'; params: { added: number; incremented: number } }
   | { name: 'scan_dismissed' }
-  | { name: 'scan_manual_entry'; params: { matched: boolean } };
+  | { name: 'scan_manual_entry'; params: { matched: boolean } }
+  | { name: 'trade_session_created'; params: { shortCode: string } }
+  | { name: 'trade_joined'; params: { sessionId: string } }
+  | { name: 'trade_confirmed'; params: { sessionId: string; role: 'host' | 'guest'; givesCount: number; receivesCount: number } }
+  | { name: 'trade_completed'; params: { sessionId: string; tradeId: string; givesCount: number; receivesCount: number } }
+  | { name: 'trade_cancelled'; params: { sessionId: string; reason: string } }
+  | { name: 'trade_commit_failed'; params: { sessionId: string; reason: string } };
 
 let analyticsInstance: Analytics | null = null;
 let initPromise: Promise<Analytics | null> | null = null;

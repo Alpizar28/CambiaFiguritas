@@ -16,6 +16,8 @@ import { useUserStore } from '../../store/userStore';
 import { useAlbumStore } from '../../store/albumStore';
 import { useMatchStore } from '../../store/matchStore';
 import { useWishlistStore } from '../../store/wishlistStore';
+import { useTradeStore } from '../../store/tradeStore';
+import { HandshakeIcon, HistoryIcon } from '../trade/components/TradeIcons';
 import { findMatches, saveUserLocation } from '../../services/matchingService';
 import { consumeMatchSlot, unlockMatchSlot } from '../../services/matchSlotsService';
 import { saveMatchBatch } from '../../services/matchHistoryService';
@@ -422,8 +424,16 @@ export function MatchesScreen() {
           <Text style={styles.eyebrow}>Intercambios cerca tuyo</Text>
           <Text style={styles.title}>Matches</Text>
         </View>
+        <TouchableOpacity
+          onPress={() => useTradeStore.getState().openModal({ kind: 'home' })}
+          style={[styles.historyBtn, styles.tradeBtn]}
+        >
+          <HandshakeIcon size={14} color={colors.primary} />
+          <Text style={[styles.historyBtnText, styles.tradeBtnText]}>En persona</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={goToHistory} style={styles.historyBtn}>
-          <Text style={styles.historyBtnText}>📜 Historial</Text>
+          <HistoryIcon size={14} color={colors.text} />
+          <Text style={styles.historyBtnText}>Historial</Text>
         </TouchableOpacity>
       </View>
 
@@ -680,16 +690,27 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   historyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: radii.sm,
     borderWidth: 1,
     borderColor: colors.border,
+    marginLeft: spacing.xs,
   },
   historyBtnText: {
     color: colors.text,
     fontSize: 12,
     fontWeight: '700',
+  },
+  tradeBtn: {
+    borderColor: colors.primary,
+    backgroundColor: '#0F2A1A',
+  },
+  tradeBtnText: {
+    color: colors.primary,
   },
   list: {
     padding: spacing.xl,

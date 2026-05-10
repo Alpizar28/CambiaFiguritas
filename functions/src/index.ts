@@ -11,3 +11,4 @@ export { consumeMatchSlot, unlockMatchSlot } from './matchSlots';
 export { createTilopayCheckout, tilopayWebhook, devCompleteOrder } from './tilopay';
 export { verifyPlayPurchase } from './playBilling';
 export { getPublicAlbum } from './publicAlbum';
+export { joinTradeSession, commitTradeSession, cancelTradeSession } from './tradeSessions';

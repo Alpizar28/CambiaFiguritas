@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Linking, Modal, View, StyleSheet } from 'react-native';
-import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  NavigationIndependentTree,
+  DarkTheme,
+} from '@react-navigation/native';
 import type { NavigationContainerRef, LinkingOptions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
@@ -12,6 +16,8 @@ import { MatchesNavigator } from '../features/matching/MatchesNavigator';
 import { ProfileScreen } from '../features/profile/ProfileScreen';
 import { RankingsScreen } from '../features/rankings/RankingsScreen';
 import { PublicAlbumScreen } from '../features/share/PublicAlbumScreen';
+import { TradeNavigator } from '../features/trade/TradeNavigator';
+import { useTradeStore } from '../store/tradeStore';
 import {
   AlbumIcon,
   EventsIcon,
@@ -19,7 +25,7 @@ import {
   ProfileIcon,
   RankingsIcon,
 } from '../components/icons/TabIcons';
-import type { RootTabParamList } from '../types/navigation';
+import type { RootTabParamList, TradeStackParamList } from '../types/navigation';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
@@ -61,6 +67,8 @@ const linking: LinkingOptions<RootTabParamList> = {
     if (uid) return `cambiafiguritas://u/${uid}`;
     const pathMatch = window.location.pathname.match(/^\/u\/([^/]+)$/);
     if (pathMatch) return `cambiafiguritas://u/${pathMatch[1]}`;
+    const tradeMatch = window.location.pathname.match(/^\/trade\/([A-Z0-9]{6})$/i);
+    if (tradeMatch) return `cambiafiguritas://trade/${tradeMatch[1]}`;
     return null;
   },
 };
@@ -69,9 +77,17 @@ export function AppNavigator() {
   const navRef = useRef<NavigationContainerRef<RootTabParamList>>(null);
   const previousRoute = useRef<string | undefined>(undefined);
   const [publicAlbumUid, setPublicAlbumUid] = useState<string | null>(null);
+  const tradeIntent = useTradeStore((s) => s.modalIntent);
+  const openTradeModal = useTradeStore((s) => s.openModal);
+  const closeTradeModal = useTradeStore((s) => s.closeModal);
 
   const handleDeepLink = (url: string | null) => {
     if (!url) return;
+    const tradeMatch = url.match(/\/trade\/([A-Z0-9]{6})/i);
+    if (tradeMatch?.[1]) {
+      openTradeModal({ kind: 'join', prefilledCode: tradeMatch[1].toUpperCase() });
+      return;
+    }
     const match = url.match(/\/u\/([a-zA-Z0-9_-]+)/);
     if (match?.[1]) {
       setPublicAlbumUid(match[1]);
@@ -168,6 +184,25 @@ export function AppNavigator() {
               uid={publicAlbumUid}
               onExitToApp={() => setPublicAlbumUid(null)}
             />
+          </View>
+        </Modal>
+      ) : null}
+
+      {tradeIntent ? (
+        <Modal visible animationType="slide" onRequestClose={closeTradeModal}>
+          <View style={styles.modalFull}>
+            <NavigationIndependentTree>
+              <NavigationContainer theme={navigationTheme}>
+                <TradeNavigator
+                  initialRoute={tradeIntent.kind === 'join' ? 'TradeJoin' : 'TradeHome'}
+                  initialParams={
+                    tradeIntent.kind === 'join'
+                      ? ({ prefilledCode: tradeIntent.prefilledCode } as TradeStackParamList['TradeJoin'])
+                      : undefined
+                  }
+                />
+              </NavigationContainer>
+            </NavigationIndependentTree>
           </View>
         </Modal>
       ) : null}
