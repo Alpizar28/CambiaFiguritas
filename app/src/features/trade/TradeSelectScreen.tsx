@@ -5,6 +5,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTradeSession } from '../../hooks/useTradeSession';
+import { usePeerAlbum } from '../../hooks/usePeerAlbum';
+import { peerNeedsSticker } from './utils/tradeSuggestion';
 import { useUserStore } from '../../store/userStore';
 import { useAlbumStore } from '../../store/albumStore';
 import {
@@ -67,8 +69,10 @@ export function TradeSelectScreen() {
   const myOffer = role === 'host' ? session?.hostStickers ?? [] : session?.guestStickers ?? [];
   const peerOffer = role === 'host' ? session?.guestStickers ?? [] : session?.hostStickers ?? [];
   const peerName = role === 'host' ? session?.guestName : session?.hostName;
+  const peerUid = role === 'host' ? session?.guestUid ?? null : session?.hostUid ?? null;
   const myConfirmedAt = role === 'host' ? session?.hostConfirmedAt : session?.guestConfirmedAt;
   const peerConfirmedAt = role === 'host' ? session?.guestConfirmedAt : session?.hostConfirmedAt;
+  const { album: peerAlbum, loaded: peerAlbumLoaded } = usePeerAlbum(peerUid);
 
   const [draftMine, setDraftMine] = useState<string[]>([]);
   const [touched, setTouched] = useState(false);
@@ -88,21 +92,31 @@ export function TradeSelectScreen() {
     [repeatedCounts],
   );
 
-  // Solo se ofrecen repetidas reales del usuario.
-  // Si el draft tiene ids obsoletos (ya no son repetidas), no se muestran.
-  const myCandidates = myRepeatedIds;
+  // Solo se ofrecen repetidas que el peer realmente necesite.
+  // Si el peer aún no tiene album cargado, asumimos que necesita todo
+  // (peer nuevo / sin marcar) — mejor mostrar opciones que esconder todo.
+  const myCandidates = useMemo(() => {
+    if (!peerAlbumLoaded) return myRepeatedIds;
+    if (!peerAlbum) return myRepeatedIds; // peer sin album → no podemos filtrar
+    return myRepeatedIds.filter((id) => peerNeedsSticker(peerAlbum.statuses, id));
+  }, [myRepeatedIds, peerAlbum, peerAlbumLoaded]);
 
-  // Limpia draft de ids que dejaron de ser repetidas (ej: usuario las
-  // intercambió o desmarcó desde el album en otro device).
+  // Limpia draft de ids que dejaron de ser repetidas o que el peer ya no necesita.
   useEffect(() => {
     if (draftMine.length === 0) return;
-    const repeatSet = new Set(myRepeatedIds);
-    const cleaned = draftMine.filter((id) => repeatSet.has(id));
+    const candSet = new Set(myCandidates);
+    const cleaned = draftMine.filter((id) => candSet.has(id));
     if (cleaned.length !== draftMine.length) {
       setDraftMine(cleaned);
       setTouched(true);
     }
-  }, [myRepeatedIds, draftMine]);
+  }, [myCandidates, draftMine]);
+
+  const noMatchAtAll =
+    peerAlbumLoaded &&
+    !!peerAlbum &&
+    myCandidates.length === 0 &&
+    peerOffer.length === 0;
 
   const handleToggleMine = useCallback((id: string) => {
     setTouched(true);
@@ -217,9 +231,23 @@ export function TradeSelectScreen() {
         </View>
       ) : null}
 
-      <Section title="Lo que doy (mis repetidas)" countSelected={draftMine.length}>
-        {myCandidates.length === 0 ? (
+      {noMatchAtAll ? (
+        <View style={styles.bannerWarn}>
+          <Text style={styles.bannerWarnText}>
+            No hay figus útiles entre ustedes dos. Cancelá y probá con otra persona.
+          </Text>
+        </View>
+      ) : null}
+
+      <Section title="Lo que doy (útiles para el otro)" countSelected={draftMine.length}>
+        {!peerAlbumLoaded ? (
+          <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.md }} />
+        ) : myRepeatedIds.length === 0 ? (
           <Text style={styles.emptyText}>No tenés repetidas todavía. Cargalas desde el álbum.</Text>
+        ) : myCandidates.length === 0 ? (
+          <Text style={styles.emptyText}>
+            Ninguna de tus repetidas le sirve al otro. Probá con otra persona.
+          </Text>
         ) : (
           myCandidates.map((id) => {
             const r = rowFor(id);
@@ -240,7 +268,9 @@ export function TradeSelectScreen() {
 
       <Section title="Lo que recibo" countSelected={peerOffer.length}>
         {peerOffer.length === 0 ? (
-          <Text style={styles.emptyText}>El otro todavía no eligió nada.</Text>
+          <Text style={styles.emptyText}>
+            El otro todavía no eligió nada útil para vos.
+          </Text>
         ) : (
           peerOffer.map((id) => {
             const r = rowFor(id);
