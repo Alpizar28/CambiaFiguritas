@@ -430,7 +430,7 @@ export const playerNames: Record<string, string> = {
   // Haiti
   HAI2: 'Johny Placide',
   HAI3: 'Carlens Arcus',
-  HAI4: 'Martin Experience',
+  HAI4: 'Martin Expérience',
   HAI5: 'Jean-Kévin Duverne',
   HAI6: 'Ricardo Adé',
   HAI7: 'Duke Lacroix',
