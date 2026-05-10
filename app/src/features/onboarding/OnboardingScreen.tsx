@@ -19,12 +19,15 @@ import { useUserStore } from '../../store/userStore';
 import { track } from '../../services/analytics';
 import { haptic } from '../../utils/haptics';
 import { shareInviteWithRef } from '../../utils/share';
+import { ImportAlbumModal } from '../album/components/ImportAlbumModal';
 
 type Slide = {
   emoji: string;
   title: string;
   description: string;
   accent: string;
+  secondaryCta?: string;
+  secondaryAction?: 'import';
 };
 
 const SLIDES: Slide[] = [
@@ -33,6 +36,14 @@ const SLIDES: Slide[] = [
     title: 'Marcá tus figuritas',
     description: 'Tocá una figurita para marcarla como obtenida. Doble tap para repetida. Mantené presionado para más opciones.',
     accent: colors.owned,
+  },
+  {
+    emoji: '📥',
+    title: 'Importá tu lista',
+    description: '¿Ya tenés tu colección anotada en otra app o en notas? Pegá la lista y marcamos todo de una.',
+    accent: colors.accent,
+    secondaryCta: 'Importar ahora',
+    secondaryAction: 'import',
   },
   {
     emoji: '🤝',
@@ -62,6 +73,7 @@ export function OnboardingScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showInviteSheet, setShowInviteSheet] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     track({ name: 'onboarding_started' });
@@ -150,6 +162,18 @@ export function OnboardingScreen() {
             </View>
             <Text style={styles.title}>{slide.title}</Text>
             <Text style={styles.description}>{slide.description}</Text>
+            {slide.secondaryAction === 'import' && slide.secondaryCta ? (
+              <Pressable
+                onPress={() => {
+                  haptic.tap();
+                  track({ name: 'album_import_opened', params: { source: 'profile' } });
+                  setImportOpen(true);
+                }}
+                style={[styles.slideCta, { borderColor: slide.accent }]}
+              >
+                <Text style={[styles.slideCtaText, { color: slide.accent }]}>{slide.secondaryCta}</Text>
+              </Pressable>
+            ) : null}
           </View>
         ))}
       </ScrollView>
@@ -175,6 +199,8 @@ export function OnboardingScreen() {
           <Text style={styles.ctaText}>{isLast ? 'Empezar' : 'Siguiente'}</Text>
         </Pressable>
       </View>
+
+      <ImportAlbumModal visible={importOpen} onClose={() => setImportOpen(false)} source="profile" />
     </View>
   );
 }
@@ -298,6 +324,17 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     textAlign: 'center',
     maxWidth: 340,
+  },
+  slideCta: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radii.md,
+    borderWidth: 2,
+  },
+  slideCtaText: {
+    fontSize: 15,
+    fontWeight: '800',
   },
   dots: {
     flexDirection: 'row',

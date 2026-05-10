@@ -408,17 +408,6 @@ export function AlbumScreen() {
               <Text style={styles.shareAlbumText}>Compartir figurita</Text>
             </Pressable>
             <Pressable
-              accessibilityLabel="Importar lista"
-              onPress={() => {
-                haptic.tap();
-                track({ name: 'album_import_opened', params: { source: 'album' } });
-                setImportModalOpen(true);
-              }}
-              style={styles.iconButton}
-            >
-              <Text style={styles.iconButtonText}>📥</Text>
-            </Pressable>
-            <Pressable
               accessibilityLabel="Buscar"
               onPress={() => { haptic.tap(); setSearchOpen((v) => !v); }}
               style={styles.iconButton}
