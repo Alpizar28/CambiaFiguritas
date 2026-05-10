@@ -31,7 +31,40 @@ export function pickTopN(matches: Match[], n: number): Match[] {
 }
 
 export function defaultZoneFilter(hasGps: boolean, hasCity: boolean): ZoneFilter {
-  if (hasGps) return '15km';
   if (hasCity) return 'mi_ciudad';
+  if (hasGps) return '15km';
   return 'todos';
+}
+
+const FALLBACK_ORDER: ZoneFilter[] = ['mi_ciudad', '15km', '50km', 'todos'];
+
+export type CascadeResult = {
+  matches: Match[];
+  appliedFilter: ZoneFilter;
+  fellBack: boolean;
+};
+
+export function cascadeZoneFilter(
+  matches: Match[],
+  preferred: ZoneFilter,
+  myCitySlug: string | null,
+  hasGps: boolean,
+): CascadeResult {
+  const startIdx = FALLBACK_ORDER.indexOf(preferred);
+  const order = startIdx >= 0 ? FALLBACK_ORDER.slice(startIdx) : (['todos'] as ZoneFilter[]);
+
+  for (const zone of order) {
+    if (zone === 'mi_ciudad' && !myCitySlug) continue;
+    if ((zone === '15km' || zone === '50km') && !hasGps) continue;
+    const filtered = applyZoneFilter(matches, zone, myCitySlug);
+    if (filtered.length > 0 || zone === 'todos') {
+      return {
+        matches: filtered,
+        appliedFilter: zone,
+        fellBack: zone !== preferred,
+      };
+    }
+  }
+
+  return { matches: [], appliedFilter: preferred, fellBack: false };
 }

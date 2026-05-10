@@ -39,7 +39,7 @@ import { PremiumCard } from '../profile/components/PremiumCard';
 import { AdBanner } from '../../components/AdBanner';
 import { MatchCardSkeleton } from '../../components/Skeleton';
 import {
-  applyZoneFilter,
+  cascadeZoneFilter,
   defaultZoneFilter,
   pickTopN,
   type ZoneFilter,
@@ -58,6 +58,21 @@ const FILTER_STORAGE_KEY = '@cf:matches:zoneFilter';
 const SORT_STORAGE_KEY = '@cf:matches:sort';
 const FREE_TOP_N = 5;
 const PREMIUM_TOP_N = 10;
+
+function appliedFilterLabel(filter: ZoneFilter): string {
+  switch (filter) {
+    case 'mi_ciudad':
+      return 'tu ciudad';
+    case '15km':
+      return 'a 15 km';
+    case '50km':
+      return 'a 50 km';
+    case 'todos':
+      return 'todos';
+    default:
+      return '';
+  }
+}
 
 type LockState = {
   used: number;
@@ -250,11 +265,15 @@ export function MatchesScreen() {
       });
   }, [hasGps, hasCity]);
 
-  const filteredMatches = useMemo(() => {
-    const filtered = applyZoneFilter(matches, filter, userCitySlug);
-    const capped = pickTopN(filtered, isPremium ? PREMIUM_TOP_N : FREE_TOP_N);
-    return sortMatches(capped, sort);
-  }, [matches, filter, userCitySlug, isPremium, sort]);
+  const { filteredMatches, appliedFilter, fellBack } = useMemo(() => {
+    const result = cascadeZoneFilter(matches, filter, userCitySlug, hasGps);
+    const capped = pickTopN(result.matches, isPremium ? PREMIUM_TOP_N : FREE_TOP_N);
+    return {
+      filteredMatches: sortMatches(capped, sort),
+      appliedFilter: result.appliedFilter,
+      fellBack: result.fellBack,
+    };
+  }, [matches, filter, userCitySlug, hasGps, isPremium, sort]);
 
   // Cuando hay matches perfectos y el sort no es perfect_first, separar en buckets
   // para renderizar la sección "Perfectos" sobre "Otros matches".
@@ -270,6 +289,18 @@ export function MatchesScreen() {
     }
     return { perfectMatches: perfect, otherMatches: rest };
   }, [filteredMatches, sort]);
+
+  const lastFellBackRef = useRef<string>('');
+  useEffect(() => {
+    if (!fellBack) return;
+    const key = `${filter}->${appliedFilter}`;
+    if (lastFellBackRef.current === key) return;
+    lastFellBackRef.current = key;
+    track({
+      name: 'matches_filter_fellback',
+      params: { preferred: filter, applied: appliedFilter },
+    });
+  }, [fellBack, filter, appliedFilter]);
 
   const handleFilterChange = (newFilter: ZoneFilter) => {
     setFilter(newFilter);
@@ -337,9 +368,10 @@ export function MatchesScreen() {
       setMatches(result);
       track({ name: 'matches_searched', params: { matchesFound: result.length } });
 
-      // Guardar batch en historial (top N filtrado, fire-and-forget)
+      // Guardar batch en historial (top N filtrado con cascada, fire-and-forget)
+      const cascadeResult = cascadeZoneFilter(result, filter, userCitySlug, hasGps);
       const batchToSave = pickTopN(
-        applyZoneFilter(result, filter, userCitySlug),
+        cascadeResult.matches,
         isPremium ? PREMIUM_TOP_N : FREE_TOP_N,
       );
       if (batchToSave.length > 0) {
@@ -650,6 +682,15 @@ export function MatchesScreen() {
                     {renderSortChip('score', 'Score')}
                     {renderSortChip('perfect_first', 'Perfectos')}
                   </View>
+                  {fellBack && filteredMatches.length > 0 ? (
+                    <View style={styles.fallbackBanner}>
+                      <Text style={styles.fallbackBannerText}>
+                        {filter === 'mi_ciudad'
+                          ? `Sin matches en ${userCity || 'tu ciudad'}. Mostrando ${appliedFilterLabel(appliedFilter)}.`
+                          : `Mostrando resultados ampliados (${appliedFilterLabel(appliedFilter)}).`}
+                      </Text>
+                    </View>
+                  ) : null}
                 </>
               ) : null}
             </View>
@@ -674,14 +715,14 @@ export function MatchesScreen() {
             ) : matches.length > 0 && filteredMatches.length === 0 ? (
               <EmptyState
                 icon="🎯"
-                title="No hay matches en esta zona"
+                title="No hay matches en tu zona"
                 message={
-                  filter === 'mi_ciudad'
-                    ? `No encontramos matches en ${userCity || 'tu ciudad'}. Probá ampliar el radio.`
-                    : 'Probá ampliar el radio para ver más matches.'
+                  filter === 'mi_ciudad' && !hasGps
+                    ? `No encontramos matches en ${userCity || 'tu ciudad'}. Activá la ubicación para buscar más lejos.`
+                    : 'Por ahora no hay coleccionistas con figuritas que coincidan en ninguna distancia.'
                 }
-                ctaLabel="Ver todos"
-                onCta={() => handleFilterChange('todos')}
+                ctaLabel="Compartir la app"
+                onCta={handleShareInvite}
               />
             ) : null
           }
@@ -895,6 +936,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginBottom: spacing.sm,
     fontStyle: 'italic',
+  },
+  fallbackBanner: {
+    backgroundColor: '#FFF4D6',
+    borderColor: '#E8B400',
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    marginBottom: spacing.sm,
+  },
+  fallbackBannerText: {
+    color: '#A87600',
+    fontSize: 12,
+    fontWeight: '600',
   },
   sortRow: {
     flexDirection: 'row',

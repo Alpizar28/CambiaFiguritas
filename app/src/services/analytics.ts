@@ -99,6 +99,7 @@ type AnalyticsEvent =
   | { name: 'events_filtered_by_zone'; params: { mode: string; resultCount: number } }
   | { name: 'event_city_set'; params: { source: 'manual' | 'reverse_geocode' | 'gps_default' } }
   | { name: 'matches_filter_default_chosen'; params: { filter: string; hasGps: boolean; hasCity: boolean } }
+  | { name: 'matches_filter_fellback'; params: { preferred: string; applied: string } }
   | { name: 'match_batch_saved'; params: { size: number; filter: string } }
   | { name: 'match_history_opened'; params: { batchCount: number } }
   | { name: 'match_history_batch_expanded'; params: { batchId: string; ageDays: number } }
