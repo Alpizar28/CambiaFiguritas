@@ -28,6 +28,7 @@ import { track } from '../../services/analytics';
 import { StatsBreakdown } from './StatsBreakdown';
 import { PremiumCard } from './components/PremiumCard';
 import { ShareCardModal } from './components/ShareCardModal';
+import { ImportAlbumModal } from '../album/components/ImportAlbumModal';
 import { Tooltip } from '../../components/Tooltip';
 import { colors, spacing, radii } from '../../constants/theme';
 import { ENABLE_PREMIUM_UI } from '../../constants/featureFlags';
@@ -50,6 +51,7 @@ export function ProfileScreen() {
   const [saved, setSaved] = useState(false);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
   const [shareCardOpen, setShareCardOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const handleLogout = () => signOut(auth);
 
@@ -249,6 +251,16 @@ export function ProfileScreen() {
         </TouchableOpacity>
       ) : null}
 
+      <TouchableOpacity
+        style={styles.shareImageButton}
+        onPress={() => {
+          track({ name: 'album_import_opened', params: { source: 'profile' } });
+          setImportOpen(true);
+        }}
+      >
+        <Text style={styles.shareImageButtonText}>📥 Importar lista de figus</Text>
+      </TouchableOpacity>
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Privacidad</Text>
         <Text style={styles.privacyHint}>
@@ -322,6 +334,11 @@ export function ProfileScreen() {
     <ShareCardModal
       visible={shareCardOpen}
       onClose={() => setShareCardOpen(false)}
+    />
+    <ImportAlbumModal
+      visible={importOpen}
+      onClose={() => setImportOpen(false)}
+      source="profile"
     />
     </View>
   );

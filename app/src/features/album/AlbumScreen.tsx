@@ -26,6 +26,7 @@ import { Tooltip } from '../../components/Tooltip';
 import { useUserStore } from '../../store/userStore';
 
 import { ShareCardModal } from '../profile/components/ShareCardModal';
+import { ImportAlbumModal } from './components/ImportAlbumModal';
 import { ScanFab } from '../../components/ScanFab';
 import { ScanScreen } from '../scan/ScanScreen';
 import type { AlbumSlot, CountryAlbumPage, Sticker, StickerStatus } from './types';
@@ -120,6 +121,7 @@ export function AlbumScreen() {
   const isDesktop = width >= 900;
   const uid = useUserStore((s) => s.user?.uid);
   const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
 
   const [activeGroupIndex, setActiveGroupIndex] = useState(0);
@@ -406,6 +408,17 @@ export function AlbumScreen() {
               <Text style={styles.shareAlbumText}>Compartir figurita</Text>
             </Pressable>
             <Pressable
+              accessibilityLabel="Importar lista"
+              onPress={() => {
+                haptic.tap();
+                track({ name: 'album_import_opened', params: { source: 'album' } });
+                setImportModalOpen(true);
+              }}
+              style={styles.iconButton}
+            >
+              <Text style={styles.iconButtonText}>📥</Text>
+            </Pressable>
+            <Pressable
               accessibilityLabel="Buscar"
               onPress={() => { haptic.tap(); setSearchOpen((v) => !v); }}
               style={styles.iconButton}
@@ -615,6 +628,7 @@ export function AlbumScreen() {
       <ShareCardModal visible={shareModalOpen} onClose={() => setShareModalOpen(false)} />
       {/* ScanFab oculto temporalmente */}
       <ScanScreen visible={scanOpen} onClose={() => setScanOpen(false)} />
+      <ImportAlbumModal visible={importModalOpen} onClose={() => setImportModalOpen(false)} source="album" />
       </View>
     );
   }
@@ -794,6 +808,7 @@ export function AlbumScreen() {
         </View>
       </ScrollView>
       <ShareCardModal visible={shareModalOpen} onClose={() => setShareModalOpen(false)} />
+      <ImportAlbumModal visible={importModalOpen} onClose={() => setImportModalOpen(false)} source="album" />
       {/* ScanFab oculto temporalmente */}
       <ScanScreen visible={scanOpen} onClose={() => setScanOpen(false)} />
       <StickerActionSheet

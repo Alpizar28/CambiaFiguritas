@@ -118,6 +118,8 @@ type AnalyticsEvent =
   | { name: 'scan_manual_entry'; params: { matched: boolean } }
   | { name: 'trade_session_created'; params: { sessionId: string } }
   | { name: 'trade_qr_scanned'; params: { code: string } }
+  | { name: 'album_import_opened'; params: { source: 'album' | 'profile' } }
+  | { name: 'album_import_applied'; params: { mode: 'merge' | 'replace'; haveCount: number; wantCount: number; unknownCount: number; addedToWishlist: boolean } }
   | { name: 'match_trade_entrypoint_profile'; params: { matchUid: string } }
   | { name: 'trade_joined'; params: { sessionId: string } }
   | { name: 'trade_confirmed'; params: { sessionId: string; role: 'host' | 'guest'; givesCount: number; receivesCount: number } }

@@ -7,6 +7,7 @@ import { track } from '../services/analytics';
 import { haptic } from '../utils/haptics';
 import { isDemoMode } from './userStore';
 import type { StickerStatus, StickerStatusMap } from '../features/album/types';
+import type { ImportItem } from '../features/album/utils/importParser';
 
 let onDemoWriteAttempt: (() => void) | null = null;
 export function setDemoWriteHandler(handler: (() => void) | null) {
@@ -39,6 +40,7 @@ type AlbumState = {
   decrementRepeated: (stickerId: string) => void;
   setRepeatedCount: (stickerId: string, count: number) => void;
   resetAlbum: () => void;
+  applyImport: (items: ImportItem[], mode: 'merge' | 'replace') => void;
   loadState: (statuses: Partial<StickerStatusMap>, repeatedCounts: Partial<Record<string, number>>) => void;
   getStatus: (stickerId: string) => StickerStatus;
   getRepeatedCount: (stickerId: string) => number;
@@ -224,6 +226,37 @@ export const useAlbumStore = create<AlbumState>()(
   },
   resetAlbum: () => {
     set({ statuses: initialStatuses, repeatedCounts: initialRepeatedCounts });
+  },
+  applyImport: (items, mode) => {
+    if (isDemoMode()) {
+      onDemoWriteAttempt?.();
+      return;
+    }
+    set((state) => {
+      const baseStatuses = mode === 'replace' ? { ...initialStatuses } : { ...state.statuses };
+      const baseCounts = mode === 'replace' ? { ...initialRepeatedCounts } : { ...state.repeatedCounts };
+      for (const item of items) {
+        const sticker = stickerById.get(item.stickerId);
+        if (item.section === 'want') {
+          baseStatuses[item.stickerId] = 'missing';
+          baseCounts[item.stickerId] = 0;
+          continue;
+        }
+        // section have
+        const isSpecial = sticker?.kind === 'special';
+        if (isSpecial) {
+          baseStatuses[item.stickerId] = 'special';
+          baseCounts[item.stickerId] = Math.max(0, item.copies - 1);
+        } else if (item.copies >= 2) {
+          baseStatuses[item.stickerId] = 'repeated';
+          baseCounts[item.stickerId] = item.copies - 1;
+        } else {
+          baseStatuses[item.stickerId] = 'owned';
+          baseCounts[item.stickerId] = 0;
+        }
+      }
+      return { statuses: baseStatuses, repeatedCounts: baseCounts };
+    });
   },
   loadState: (loadedStatuses, loadedCounts) => {
     set({
