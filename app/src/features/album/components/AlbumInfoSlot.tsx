@@ -125,27 +125,30 @@ const styles = StyleSheet.create({
   countrySlotMobile: {
     padding: 4,
     borderWidth: 1.5,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: 2,
   },
   countryNameMobile: {
-    fontSize: 16,
-    letterSpacing: -0.4,
-    lineHeight: 18,
+    fontSize: 13,
+    letterSpacing: -0.3,
+    lineHeight: 15,
   },
   kickerMobile: {
-    fontSize: 9,
+    fontSize: 8,
     letterSpacing: 0,
+    lineHeight: 10,
   },
   flagRowMobile: {
     gap: 4,
-    marginTop: 2,
+    marginTop: 0,
   },
   flagEmojiMobile: {
-    fontSize: 14,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 14,
   },
   metaMobile: {
-    fontSize: 9,
+    fontSize: 8,
+    lineHeight: 10,
   },
   groupSlotMobile: {
     padding: 0,

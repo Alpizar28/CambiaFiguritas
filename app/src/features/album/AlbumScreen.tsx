@@ -121,6 +121,7 @@ const COUNTRY_BTN_WIDTH = 70;
 export function AlbumScreen() {
   const { width } = useWindowDimensions();
   const [activePageIndex, setActivePageIndex] = useState(0);
+  const [pagerHeight, setPagerHeight] = useState(0);
   const insets = useSafeAreaInsets();
   const isDesktop = width >= 900;
   const uid = useUserStore((s) => s.user?.uid);
@@ -669,7 +670,13 @@ export function AlbumScreen() {
             </View>
           </ScrollView>
         ) : (
-          <View style={styles.mobilePagerWrap}>
+          <View
+            style={styles.mobilePagerWrap}
+            onLayout={(e) => {
+              const h = e.nativeEvent.layout.height;
+              if (h && h !== pagerHeight) setPagerHeight(h);
+            }}
+          >
             <FlatList
               ref={mobilePagerRef}
               data={activeGroup.pages}
@@ -684,7 +691,9 @@ export function AlbumScreen() {
                 if (idx !== activePageIndex) setActivePageIndex(idx);
               }}
               renderItem={({ item }) => (
-                <View style={{ width, height: '100%' }}>{renderMobileAlbumPage(item)}</View>
+                <View style={{ width, height: pagerHeight || undefined }}>
+                  {renderMobileAlbumPage(item)}
+                </View>
               )}
               style={{ flex: 1 }}
             />
