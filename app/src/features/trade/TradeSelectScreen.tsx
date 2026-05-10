@@ -102,6 +102,13 @@ export function TradeSelectScreen() {
     return myRepeatedIds.filter((id) => peerNeedsSticker(peerAlbum.statuses, id));
   }, [myRepeatedIds, peerAlbum, peerAlbumLoaded]);
 
+  // Filtra lo que el otro ofrece por lo que yo realmente necesito.
+  // Si mi statuses aun no cargo, fallback a la lista cruda.
+  const peerOfferUseful = useMemo(() => {
+    if (!statuses || Object.keys(statuses).length === 0) return peerOffer;
+    return peerOffer.filter((id) => peerNeedsSticker(statuses, id));
+  }, [peerOffer, statuses]);
+
   // Limpia draft de ids que dejaron de ser repetidas o que el peer ya no necesita.
   useEffect(() => {
     if (draftMine.length === 0) return;
@@ -117,7 +124,7 @@ export function TradeSelectScreen() {
     peerAlbumLoaded &&
     !!peerAlbum &&
     myCandidates.length === 0 &&
-    peerOffer.length === 0;
+    peerOfferUseful.length === 0;
 
   const handleToggleMine = useCallback((id: string) => {
     setTouched(true);
@@ -158,7 +165,7 @@ export function TradeSelectScreen() {
       const synced = await handleSyncSelection();
       if (!synced) return;
     }
-    if (draftMine.length === 0 && peerOffer.length === 0) {
+    if (draftMine.length === 0 && peerOfferUseful.length === 0) {
       Alert.alert('Falta seleccionar', 'Marcá al menos una figu para intercambiar.');
       return;
     }
@@ -167,7 +174,7 @@ export function TradeSelectScreen() {
       await confirmTrade(sessionId, role);
       track({
         name: 'trade_confirmed',
-        params: { sessionId, role, givesCount: draftMine.length, receivesCount: peerOffer.length },
+        params: { sessionId, role, givesCount: draftMine.length, receivesCount: peerOfferUseful.length },
       });
       navigation.replace('TradeReview', { sessionId, role });
     } catch (e) {
@@ -176,7 +183,7 @@ export function TradeSelectScreen() {
     } finally {
       setWorking(false);
     }
-  }, [sessionId, role, draftMine, peerOffer.length, draftDiffersFromRemote, handleSyncSelection, navigation]);
+  }, [sessionId, role, draftMine, peerOfferUseful.length, draftDiffersFromRemote, handleSyncSelection, navigation]);
 
   const handleCancel = useCallback(async () => {
     if (!sessionId) {
@@ -268,34 +275,32 @@ export function TradeSelectScreen() {
         )}
       </Section>
 
-      <Section title="Lo que recibo" countSelected={peerOffer.length}>
+      <Section title="Lo que recibo" countSelected={peerOfferUseful.length}>
         {peerOffer.length === 0 ? (
           <Text style={styles.emptyText}>
             El otro todavía no eligió nada útil para vos.
           </Text>
+        ) : peerOfferUseful.length === 0 ? (
+          <Text style={styles.emptyText}>
+            {peerOffer.length === 1
+              ? 'La figu que eligió el otro ya la tenés.'
+              : `Las ${peerOffer.length} figus que eligió el otro ya las tenés todas.`}
+          </Text>
         ) : (
-          peerOffer.map((id) => {
+          peerOfferUseful.map((id) => {
             const r = rowFor(id);
-            const myStatus = statuses[id];
-            const alreadyHave = myStatus === 'owned' || myStatus === 'repeated';
             return (
-              <View key={id}>
-                <StickerCheckRow
-                  stickerId={id}
-                  displayCode={r.displayCode}
-                  label={r.label}
-                  countryName={r.countryName}
-                  countryFlag={r.countryFlag}
-                  selected
-                  disabled
-                  onToggle={() => {}}
-                />
-                {alreadyHave ? (
-                  <Text style={styles.dupWarn}>
-                    Ya la tenés ({myStatus === 'repeated' ? 'repetida' : 'pegada'}). Quedará como repetida.
-                  </Text>
-                ) : null}
-              </View>
+              <StickerCheckRow
+                key={id}
+                stickerId={id}
+                displayCode={r.displayCode}
+                label={r.label}
+                countryName={r.countryName}
+                countryFlag={r.countryFlag}
+                selected
+                disabled
+                onToggle={() => {}}
+              />
             );
           })
         )}
@@ -306,7 +311,7 @@ export function TradeSelectScreen() {
           Doy: <Text style={styles.summaryStrong}>{draftMine.length}</Text>
         </Text>
         <Text style={styles.summaryLine}>
-          Recibo: <Text style={styles.summaryStrong}>{peerOffer.length}</Text>
+          Recibo: <Text style={styles.summaryStrong}>{peerOfferUseful.length}</Text>
         </Text>
       </View>
 
@@ -453,14 +458,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 13,
     paddingVertical: spacing.sm,
-  },
-  dupWarn: {
-    color: '#FFB85C',
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: -spacing.xs,
-    marginBottom: spacing.xs,
-    paddingHorizontal: spacing.sm,
   },
   summary: {
     flexDirection: 'row',
