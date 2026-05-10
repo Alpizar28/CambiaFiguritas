@@ -364,7 +364,7 @@ export function AlbumScreen() {
     >
       <View style={styles.pageTopline}>
         <Text style={styles.pageLabel}>Pagina {page.pageInCountry}</Text>
-        <Text style={styles.pageCode}>{activeGroup.country.code}</Text>
+        <Text style={[styles.pageCode, { color: activeAccent }]}>{activeGroup.country.code}</Text>
       </View>
       <View style={styles.originalGrid}>{page.slots.map(renderSlot)}</View>
     </View>
