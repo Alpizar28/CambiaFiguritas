@@ -35,7 +35,7 @@ export function TradeHomeScreen() {
         return;
       }
       const session = await createSession(user);
-      track({ name: 'trade_session_created', params: { shortCode: session.shortCode } });
+      track({ name: 'trade_session_created', params: { sessionId: session.id } });
       navigation.navigate('TradeHost', { sessionId: session.id });
     } catch (e) {
       const msg = e instanceof TradeError ? e.message : 'No se pudo crear la sesión.';

@@ -61,15 +61,17 @@ const linking: LinkingOptions<RootTabParamList> = {
     },
   },
   getInitialURL: async () => {
-    if (typeof window === 'undefined') return null;
-    const params = new URLSearchParams(window.location.search);
-    const uid = params.get('u');
-    if (uid) return `cambiafiguritas://u/${uid}`;
-    const pathMatch = window.location.pathname.match(/^\/u\/([^/]+)$/);
-    if (pathMatch) return `cambiafiguritas://u/${pathMatch[1]}`;
-    const tradeMatch = window.location.pathname.match(/^\/trade\/([A-Z0-9]{6})$/i);
-    if (tradeMatch) return `cambiafiguritas://trade/${tradeMatch[1]}`;
-    return null;
+    if (typeof window !== 'undefined' && window.location) {
+      const params = new URLSearchParams(window.location.search);
+      const uid = params.get('u');
+      if (uid) return `cambiafiguritas://u/${uid}`;
+      const pathMatch = window.location.pathname.match(/^\/u\/([^/]+)$/);
+      if (pathMatch) return `cambiafiguritas://u/${pathMatch[1]}`;
+      const tradeMatch = window.location.pathname.match(/^\/trade\/([A-Z0-9]{6})$/i);
+      if (tradeMatch) return `cambiafiguritas://trade/${tradeMatch[1]}`;
+      return null;
+    }
+    return (await Linking.getInitialURL()) ?? null;
   },
 };
 

@@ -21,17 +21,19 @@ export function StickerCheckRow({
   disabled,
   onToggle,
 }: StickerCheckRowProps) {
+  const isDisabled = disabled ?? false;
   return (
     <Pressable
-      onPress={() => !disabled && onToggle(stickerId)}
+      onPress={() => onToggle(stickerId)}
+      disabled={isDisabled}
       style={({ pressed }) => [
         styles.row,
         selected && styles.rowSelected,
-        pressed && !disabled && styles.rowPressed,
-        disabled && styles.rowDisabled,
+        pressed && !isDisabled && styles.rowPressed,
+        isDisabled && styles.rowDisabled,
       ]}
       accessibilityRole="checkbox"
-      accessibilityState={{ checked: selected, disabled: disabled ?? false }}
+      accessibilityState={{ checked: selected, disabled: isDisabled }}
     >
       <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
         {selected ? <CheckIcon size={14} color="#001A0A" /> : null}

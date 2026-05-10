@@ -52,14 +52,28 @@ export function TradeCompleteScreen() {
           <Text style={styles.sumLine}>
             {session.guestName} → {session.hostName}: {givesFromPeer.length} figus
           </Text>
-          {[...givesFromMe, ...givesFromPeer].slice(0, 30).map((id) => {
-            const s = stickerById.get(id);
+          {(() => {
+            const combined = [...givesFromMe, ...givesFromPeer];
+            const visible = combined.slice(0, 30);
+            const hidden = combined.length - visible.length;
             return (
-              <Text key={id} style={styles.code}>
-                <Text style={styles.codeStrong}>{s?.displayCode ?? id}</Text> {s?.label || s?.countryName || ''}
-              </Text>
+              <>
+                {visible.map((id) => {
+                  const s = stickerById.get(id);
+                  return (
+                    <Text key={id} style={styles.code}>
+                      <Text style={styles.codeStrong}>{s?.displayCode ?? id}</Text> {s?.label || s?.countryName || ''}
+                    </Text>
+                  );
+                })}
+                {hidden > 0 ? (
+                  <Text style={styles.code}>
+                    <Text style={styles.codeStrong}>+{hidden} más</Text>
+                  </Text>
+                ) : null}
+              </>
             );
-          })}
+          })()}
         </View>
       ) : null}
 

@@ -162,7 +162,10 @@ export function MatchProfileScreen({ route, navigation }: Props) {
           <ActionButton
             label="En persona"
             color={colors.primary}
-            onPress={() => useTradeStore.getState().openModal({ kind: 'home' })}
+            onPress={() => {
+              track({ name: 'match_trade_entrypoint_profile', params: { matchUid: user.uid } });
+              useTradeStore.getState().openModal({ kind: 'home' });
+            }}
           />
           <ActionButton
             label="WhatsApp"

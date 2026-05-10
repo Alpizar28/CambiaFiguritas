@@ -63,17 +63,32 @@ export function QRScanner({ onResult, onClose }: QRScannerProps) {
               onBarcodeScanned={(event) => {
                 if (lockedRef.current) return;
                 lockedRef.current = true;
-                onResult(event.data);
+                try {
+                  onResult(event.data);
+                } finally {
+                  setTimeout(() => {
+                    lockedRef.current = false;
+                  }, 1500);
+                }
               }}
             />
             <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]} pointerEvents="box-none">
-              <Pressable onPress={onClose} hitSlop={12} style={styles.iconBtn}>
+              <Pressable
+                onPress={onClose}
+                hitSlop={12}
+                style={styles.iconBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar escáner"
+              >
                 <CloseIcon size={20} color="#FFFFFF" />
               </Pressable>
               <Pressable
                 onPress={() => setTorchOn((v) => !v)}
                 hitSlop={12}
                 style={[styles.iconBtn, torchOn && styles.iconBtnActive]}
+                accessibilityRole="button"
+                accessibilityLabel="Alternar linterna"
+                accessibilityState={{ selected: torchOn }}
               >
                 <FlashIcon size={20} color={torchOn ? '#FFD600' : '#FFFFFF'} />
               </Pressable>

@@ -1,5 +1,4 @@
 import {
-  addDoc,
   collection,
   doc,
   getDoc,
@@ -13,7 +12,6 @@ import {
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from './firebase';
 import { loadUserAlbum } from './albumSyncService';
-import { generateShortCode } from '../features/trade/utils/shortCode';
 import { suggestGives } from '../features/trade/utils/tradeSuggestion';
 import {
   ACTIVE_TRADE_STATUSES,
@@ -22,9 +20,6 @@ import {
   type TradeSessionStatus,
 } from '../features/trade/types';
 import type { AppUser } from '../types/user';
-
-const SESSION_TTL_MS = 10 * 60 * 1000;
-const MAX_SHORT_CODE_RETRIES = 8;
 
 function fromDoc(id: string, data: Record<string, unknown>): TradeSession {
   return {
@@ -47,18 +42,6 @@ function fromDoc(id: string, data: Record<string, unknown>): TradeSession {
     tradeId: (data.tradeId as string | null) ?? null,
     failureReason: (data.failureReason as string | null) ?? null,
   };
-}
-
-async function shortCodeIsTaken(shortCode: string): Promise<boolean> {
-  const snap = await getDocs(
-    query(
-      collection(db, 'tradeSessions'),
-      where('shortCode', '==', shortCode),
-      where('status', '==', 'waiting'),
-      limit(1),
-    ),
-  );
-  return !snap.empty;
 }
 
 export async function findActiveSessionForUser(
@@ -94,56 +77,31 @@ export async function findActiveSessionForUser(
 }
 
 export async function createSession(host: AppUser): Promise<TradeSession> {
-  const existing = await findActiveSessionForUser(host.uid);
-  if (existing) {
-    throw new TradeError('existing_session', 'Ya tenés un intercambio en curso.', {
-      sessionId: existing.id,
-    });
-  }
-
   const myAlbum = await loadUserAlbum(host.uid);
-
-  let shortCode = '';
-  for (let attempt = 0; attempt < MAX_SHORT_CODE_RETRIES; attempt += 1) {
-    const candidate = generateShortCode();
-    if (!(await shortCodeIsTaken(candidate))) {
-      shortCode = candidate;
-      break;
-    }
-  }
-  if (!shortCode) {
-    throw new TradeError('shortcode_collision', 'No pudimos generar un código único, probá de nuevo.');
-  }
-
-  const now = Date.now();
-  const expiresAt = now + SESSION_TTL_MS;
-
   const initialHostStickers = Object.entries(myAlbum?.repeatedCounts ?? {})
     .filter(([, count]) => count > 0)
     .map(([id]) => id)
     .slice(0, 25);
 
-  const sessionRef = await addDoc(collection(db, 'tradeSessions'), {
-    shortCode,
-    hostUid: host.uid,
-    guestUid: null,
-    hostName: host.name,
-    guestName: null,
-    hostPhotoUrl: host.photoUrl ?? null,
-    guestPhotoUrl: null,
-    status: 'waiting' as TradeSessionStatus,
-    hostStickers: initialHostStickers,
-    guestStickers: [],
-    hostConfirmedAt: null,
-    guestConfirmedAt: null,
-    createdAt: now,
-    expiresAt,
-    completedAt: null,
-    tradeId: null,
-    failureReason: null,
-  });
+  const callable = httpsCallable<
+    { hostStickers: string[] },
+    { ok: true; sessionId: string; shortCode: string }
+  >(functions, 'createTradeSession');
+  let res;
+  try {
+    res = await callable({ hostStickers: initialHostStickers });
+  } catch (e) {
+    const err = e as { code?: string; message?: string; details?: Record<string, unknown> };
+    if (err?.code === 'functions/failed-precondition') {
+      throw new TradeError('existing_session', err.message ?? 'Ya tenés un intercambio en curso.', err.details);
+    }
+    if (err?.code === 'functions/resource-exhausted') {
+      throw new TradeError('shortcode_collision', 'No pudimos generar un código único, probá de nuevo.');
+    }
+    throw new TradeError('create_failed', err?.message ?? 'No se pudo crear la sesión.');
+  }
 
-  const snap = await getDoc(sessionRef);
+  const snap = await getDoc(doc(db, 'tradeSessions', res.data.sessionId));
   if (!snap.exists()) {
     throw new TradeError('create_failed', 'No se pudo crear la sesión.');
   }

@@ -90,7 +90,7 @@ export const joinTradeSession = onCall<JoinPayload>(
     assertAuth(request.auth?.uid);
     const guestUid = request.auth!.uid;
     const shortCode = (request.data?.shortCode ?? '').toString().trim().toUpperCase();
-    if (!/^[A-Z2-9]{6}$/.test(shortCode)) {
+    if (!/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/.test(shortCode)) {
       throw new HttpsError('invalid-argument', 'Código inválido.');
     }
 
@@ -117,6 +117,11 @@ export const joinTradeSession = onCall<JoinPayload>(
     if (existing) {
       const existingData = existing.data() as TradeSessionDoc;
       if (existingData.expiresAt > now) {
+        // Idempotent: si el caller ya está participando en una sesión activa
+        // con el mismo shortCode, devolvé esa sesión en vez de fallar.
+        if (existingData.shortCode === shortCode && existingData.guestUid === guestUid) {
+          return { ok: true, sessionId: existing.id };
+        }
         throw new HttpsError(
           'failed-precondition',
           'Ya tenés un intercambio en curso.',
@@ -128,7 +133,7 @@ export const joinTradeSession = onCall<JoinPayload>(
     const matching = await db
       .collection('tradeSessions')
       .where('shortCode', '==', shortCode)
-      .where('status', '==', 'waiting')
+      .where('status', 'in', ['waiting', 'paired', 'selecting', 'host_confirmed', 'guest_confirmed'])
       .limit(1)
       .get();
     if (matching.empty) {
@@ -151,6 +156,15 @@ export const joinTradeSession = onCall<JoinPayload>(
         throw new HttpsError('not-found', 'Sesión no encontrada.');
       }
       const session = sessionSnap.data() as TradeSessionDoc;
+
+      // Idempotencia: mismo guest reintentando un join ya completado por él.
+      if (session.guestUid === guestUid) {
+        if (isExpired(session, now)) {
+          throw new HttpsError('deadline-exceeded', 'Sesión expirada.');
+        }
+        return { ok: true, sessionId: sessionRef.id };
+      }
+
       if (session.status !== 'waiting' || session.guestUid !== null) {
         throw new HttpsError('failed-precondition', 'Sesión ya emparejada.');
       }
@@ -192,6 +206,151 @@ export const joinTradeSession = onCall<JoinPayload>(
   },
 );
 
+// Reserva atómica de shortCode + creación de sesión.
+// Usa un doc en `tradeShortCodes/{shortCode}` como lock único; la creación
+// del lock falla si ya existe, lo que hace que el chequeo de unicidad sea
+// transaccional. Además fija la sesión activa del host bajo el mismo lock.
+
+type CreatePayload = {
+  hostStickers: string[];
+};
+
+const SESSION_TTL_MS = 10 * 60 * 1000;
+
+export const createTradeSession = onCall<CreatePayload>(
+  { region: 'us-central1' },
+  async (request) => {
+    assertAuth(request.auth?.uid);
+    const hostUid = request.auth!.uid;
+    const hostStickersRaw = Array.isArray(request.data?.hostStickers)
+      ? (request.data!.hostStickers as unknown[]).map((v) => String(v)).slice(0, MAX_STICKERS_PER_SIDE)
+      : [];
+    const hostStickers = Array.from(new Set(hostStickersRaw));
+
+    const db = getFirestore();
+    const now = Date.now();
+
+    const userSnap = await db.doc(`users/${hostUid}`).get();
+    if (!userSnap.exists) {
+      throw new HttpsError('failed-precondition', 'Tu perfil no existe.');
+    }
+    const userData = userSnap.data() as { name?: string; photoUrl?: string };
+
+    // Active-session lock atómico: asegura una sola sesión activa por usuario.
+    const userLockRef = db.doc(`tradeUserLocks/${hostUid}`);
+
+    // Reservación de shortCode con rejection-sampling fuera de la transacción
+    // (lectura), pero la creación se hace en transacción para garantizar
+    // unicidad incluso bajo concurrencia.
+    let attempts = 0;
+    const MAX_ATTEMPTS = 8;
+
+    while (attempts < MAX_ATTEMPTS) {
+      attempts += 1;
+      const candidate = generateServerShortCode();
+      const codeLockRef = db.doc(`tradeShortCodes/${candidate}`);
+      const sessionRef = db.collection('tradeSessions').doc();
+      const expiresAt = now + SESSION_TTL_MS;
+
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await db.runTransaction(async (tx) => {
+          const lockSnap = await tx.get(userLockRef);
+          if (lockSnap.exists) {
+            const lock = lockSnap.data() as { sessionId?: string; expiresAt?: number };
+            if ((lock.expiresAt ?? 0) > now) {
+              const existingSessionId = lock.sessionId;
+              if (existingSessionId) {
+                const existingSnap = await tx.get(db.doc(`tradeSessions/${existingSessionId}`));
+                if (existingSnap.exists) {
+                  const existing = existingSnap.data() as TradeSessionDoc;
+                  if (
+                    ACTIVE_STATUSES.includes(existing.status) &&
+                    existing.expiresAt > now
+                  ) {
+                    throw new HttpsError(
+                      'failed-precondition',
+                      'Ya tenés un intercambio en curso.',
+                      { existingSessionId },
+                    );
+                  }
+                }
+              }
+            }
+          }
+
+          const codeSnap = await tx.get(codeLockRef);
+          if (codeSnap.exists) {
+            return { collision: true } as const;
+          }
+
+          tx.create(codeLockRef, {
+            sessionId: sessionRef.id,
+            hostUid,
+            createdAt: now,
+            expiresAt,
+          });
+          tx.set(userLockRef, {
+            sessionId: sessionRef.id,
+            expiresAt,
+            updatedAt: now,
+          });
+
+          const newSession: TradeSessionDoc = {
+            shortCode: candidate,
+            hostUid,
+            guestUid: null,
+            hostName: userData.name ?? 'Usuario',
+            guestName: null,
+            hostPhotoUrl: userData.photoUrl ?? null,
+            guestPhotoUrl: null,
+            status: 'waiting',
+            hostStickers,
+            guestStickers: [],
+            hostConfirmedAt: null,
+            guestConfirmedAt: null,
+            createdAt: now,
+            expiresAt,
+            completedAt: null,
+            tradeId: null,
+            failureReason: null,
+          };
+          tx.create(sessionRef, newSession);
+
+          return { collision: false, sessionId: sessionRef.id, shortCode: candidate } as const;
+        });
+
+        if (result.collision) continue;
+        return { ok: true, sessionId: result.sessionId, shortCode: result.shortCode };
+      } catch (e) {
+        if (e instanceof HttpsError) throw e;
+        // Otra causa (race en tx.create) → reintentar.
+        continue;
+      }
+    }
+
+    throw new HttpsError('resource-exhausted', 'No pudimos generar un código único, probá de nuevo.');
+  },
+);
+
+const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function generateServerShortCode(length = 6): string {
+  // crypto.randomBytes(node) — admin SDK runs in node 18+.
+  // Acceso lazy para evitar import cíclico arriba.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const nodeCrypto = require('node:crypto') as typeof import('node:crypto');
+  const accept = Math.floor(256 / ALPHABET.length) * ALPHABET.length;
+  let out = '';
+  while (out.length < length) {
+    const buf = nodeCrypto.randomBytes((length - out.length) * 2);
+    for (let i = 0; i < buf.length && out.length < length; i += 1) {
+      const b = buf[i];
+      if (b < accept) out += ALPHABET[b % ALPHABET.length];
+    }
+  }
+  return out;
+}
+
 type CommitPayload = { sessionId: string };
 
 export const commitTradeSession = onCall<CommitPayload>(
@@ -215,11 +374,11 @@ export const commitTradeSession = onCall<CommitPayload>(
         throw new HttpsError('not-found', 'Sesión no encontrada.');
       }
       const session = sessionSnap.data() as TradeSessionDoc;
-      if (session.status === 'completed' && session.tradeId) {
-        return { ok: true, alreadyCompleted: true, tradeId: session.tradeId };
-      }
       if (callerUid !== session.hostUid && callerUid !== session.guestUid) {
         throw new HttpsError('permission-denied', 'No participás de esta sesión.');
+      }
+      if (session.status === 'completed' && session.tradeId) {
+        return { ok: true, alreadyCompleted: true, tradeId: session.tradeId };
       }
       if (!session.guestUid) {
         throw new HttpsError('failed-precondition', 'Sesión sin guest.');
@@ -338,6 +497,11 @@ export const commitTradeSession = onCall<CommitPayload>(
         tradeId: tradeRef.id,
         failureReason: null,
       });
+      tx.delete(db.doc(`tradeShortCodes/${session.shortCode}`));
+      tx.delete(db.doc(`tradeUserLocks/${session.hostUid}`));
+      if (session.guestUid) {
+        tx.delete(db.doc(`tradeUserLocks/${session.guestUid}`));
+      }
 
       tx.update(db.doc(`users/${session.hostUid}`), {
         reputationUp: FieldValue.increment(1),
@@ -382,6 +546,12 @@ export const cancelTradeSession = onCall<CancelPayload>(
         return { ok: true, alreadyTerminal: true };
       }
       tx.update(sessionRef, { status: 'cancelled', failureReason: reason });
+      // Liberá locks para que ambos puedan abrir nuevas sesiones de inmediato.
+      tx.delete(db.doc(`tradeShortCodes/${session.shortCode}`));
+      tx.delete(db.doc(`tradeUserLocks/${session.hostUid}`));
+      if (session.guestUid) {
+        tx.delete(db.doc(`tradeUserLocks/${session.guestUid}`));
+      }
       return { ok: true };
     });
   },

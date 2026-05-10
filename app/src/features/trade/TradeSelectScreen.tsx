@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -110,15 +110,17 @@ export function TradeSelectScreen() {
     return a.some((id, i) => id !== b[i]);
   }, [myOffer, draftMine]);
 
-  const handleSyncSelection = useCallback(async () => {
-    if (!sessionId) return;
+  const handleSyncSelection = useCallback(async (): Promise<boolean> => {
+    if (!sessionId) return false;
     setWorking(true);
     try {
       await updateMySelection(sessionId, role, draftMine);
       setTouched(false);
+      return true;
     } catch (e) {
       console.error('[trade] update selection failed', e);
       Alert.alert('Error', 'No pudimos guardar tu selección. Probá de nuevo.');
+      return false;
     } finally {
       setWorking(false);
     }
@@ -127,7 +129,8 @@ export function TradeSelectScreen() {
   const handleConfirm = useCallback(async () => {
     if (!sessionId) return;
     if (draftDiffersFromRemote) {
-      await handleSyncSelection();
+      const synced = await handleSyncSelection();
+      if (!synced) return;
     }
     if (draftMine.length === 0 && peerOffer.length === 0) {
       Alert.alert('Falta seleccionar', 'Marcá al menos una figu para intercambiar.');
@@ -158,11 +161,12 @@ export function TradeSelectScreen() {
     try {
       await cancelTradeSession(sessionId, `${role}_cancelled`);
       track({ name: 'trade_cancelled', params: { sessionId, reason: `${role}_cancelled` } });
-    } catch (e) {
-      console.error('[trade] cancel failed', e);
-    } finally {
       clearTrade();
       navigation.replace('TradeHome');
+    } catch (e) {
+      console.error('[trade] cancel failed', e);
+      Alert.alert('Error', 'No pudimos cancelar. Probá de nuevo.');
+    } finally {
       setWorking(false);
     }
   }, [sessionId, role, navigation, clearTrade]);
@@ -306,7 +310,7 @@ export function TradeSelectScreen() {
 type SectionProps = {
   title: string;
   countSelected: number;
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
 function Section({ title, countSelected, children }: SectionProps) {

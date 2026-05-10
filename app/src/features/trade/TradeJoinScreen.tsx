@@ -21,7 +21,7 @@ function extractCodeFromQR(value: string): string | null {
   if (trimmed.startsWith(QR_PREFIX)) {
     return normalizeShortCode(trimmed.slice(QR_PREFIX.length));
   }
-  const match = trimmed.match(/\/trade\/([A-Za-z0-9]{6})/);
+  const match = trimmed.match(/\/trade\/([A-Za-z0-9]{6})(?![A-Za-z0-9])/);
   if (match?.[1]) return normalizeShortCode(match[1]);
   if (/^[A-Za-z0-9]{6}$/.test(trimmed)) return normalizeShortCode(trimmed);
   return null;

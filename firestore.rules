@@ -179,17 +179,26 @@ service cloud.firestore {
     //   - delete: deshabilitado.
     match /tradeSessions/{sessionId} {
       allow read: if isSignedIn();
+      // create: ahora la sesión nace via Cloud Function `createTradeSession`
+      // (admin SDK), por lo que la creación client-side queda bloqueada.
+      // Mantenemos la validación de shape para defensa en profundidad si
+      // alguien intentara escribir directamente.
       allow create: if isSignedIn()
                     && request.resource.data.hostUid == request.auth.uid
                     && request.resource.data.guestUid == null
                     && request.resource.data.status == 'waiting'
                     && request.resource.data.shortCode is string
                     && request.resource.data.shortCode.size() == 6
+                    && request.resource.data.hostName is string
+                    && request.resource.data.hostName.size() <= 80
+                    && (request.resource.data.hostPhotoUrl == null ||
+                        request.resource.data.hostPhotoUrl is string)
                     && request.resource.data.hostStickers is list
                     && request.resource.data.hostStickers.size() <= 200
                     && request.resource.data.guestStickers is list
                     && request.resource.data.guestStickers.size() == 0
                     && request.resource.data.createdAt is number
+                    && request.resource.data.createdAt <= request.time.toMillis()
                     && request.resource.data.expiresAt is number
                     && request.resource.data.expiresAt <= request.time.toMillis() + 11 * 60 * 1000
                     && request.resource.data.expiresAt > request.time.toMillis()
@@ -206,6 +215,15 @@ service cloud.firestore {
                     && request.resource.data.status in ['selecting', 'paired',
                                                           'host_confirmed', 'guest_confirmed',
                                                           'cancelled']
+                    // Transition guard: estados terminales no se pueden revivir
+                    // y no se permite retroceder de host_/guest_confirmed a selecting/paired.
+                    && resource.data.status != 'cancelled'
+                    && resource.data.status != 'completed'
+                    && resource.data.status != 'expired'
+                    && !(resource.data.status == 'host_confirmed'
+                          && request.resource.data.status in ['selecting', 'paired'])
+                    && !(resource.data.status == 'guest_confirmed'
+                          && request.resource.data.status in ['selecting', 'paired'])
                     && (
                       // Host edita sólo su lado.
                       (request.auth.uid == resource.data.hostUid
@@ -222,6 +240,15 @@ service cloud.firestore {
                         && request.resource.data.guestStickers.size() <= 200)
                     );
       allow delete: if false;
+    }
+
+    // Locks transitorios para reserva atómica de shortCode y sesión activa
+    // por usuario. Backend-only (admin SDK).
+    match /tradeShortCodes/{shortCode} {
+      allow read, write: if false;
+    }
+    match /tradeUserLocks/{uid} {
+      allow read, write: if false;
     }
 
     // trades: historial inmutable de intercambios completados.

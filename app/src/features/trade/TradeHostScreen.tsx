@@ -59,11 +59,12 @@ export function TradeHostScreen() {
     try {
       await cancelTradeSession(sessionId, 'host_cancelled');
       track({ name: 'trade_cancelled', params: { sessionId, reason: 'host_cancelled' } });
-    } catch (e) {
-      console.error('[trade] cancel failed', e);
-    } finally {
       clearTrade();
       navigation.replace('TradeHome');
+    } catch (e) {
+      console.error('[trade] cancel failed', e);
+      Alert.alert('Error', 'No pudimos cancelar. Probá de nuevo.');
+    } finally {
       setCancelling(false);
     }
   }, [sessionId, navigation, clearTrade]);
@@ -78,6 +79,17 @@ export function TradeHostScreen() {
     if (!session) return 0;
     return Math.max(0, Math.floor((session.expiresAt - now) / 1000));
   }, [session, now]);
+
+  const isExpired = !!session && (remainingSeconds <= 0 || session.status === 'expired');
+
+  useEffect(() => {
+    if (!session || !sessionId) return;
+    if (remainingSeconds > 0) return;
+    if (session.status === 'expired' || session.status === 'cancelled' || session.status === 'completed') return;
+    cancelTradeSession(sessionId, 'expired').catch((e) => {
+      console.error('[trade] auto-expire failed', e);
+    });
+  }, [remainingSeconds, session, sessionId]);
 
   const mm = Math.floor(remainingSeconds / 60).toString().padStart(2, '0');
   const ss = (remainingSeconds % 60).toString().padStart(2, '0');
@@ -115,15 +127,30 @@ export function TradeHostScreen() {
       </View>
 
       <View style={styles.qrCard}>
-        <QRDisplay value={qrPayload} size={220} />
-        <Text style={styles.codeLabel}>Código</Text>
-        <Pressable onPress={handleCopy} style={({ pressed }) => [styles.codeBox, pressed && styles.pressed]}>
-          <Text style={styles.codeText}>{session.shortCode}</Text>
-          <Text style={styles.copyHint}>Tocá para copiar</Text>
-        </Pressable>
-        <Text style={styles.timer}>
-          Expira en {mm}:{ss}
-        </Text>
+        {isExpired ? (
+          <View style={styles.expiredBox}>
+            <Text style={styles.expiredTitle}>Sesión expirada</Text>
+            <Text style={styles.expiredText}>
+              El código ya no es válido. Cancelá y armá una nueva sesión.
+            </Text>
+          </View>
+        ) : (
+          <>
+            <QRDisplay value={qrPayload} size={220} />
+            <Text style={styles.codeLabel}>Código</Text>
+            <Pressable
+              onPress={handleCopy}
+              disabled={isExpired}
+              style={({ pressed }) => [styles.codeBox, pressed && styles.pressed]}
+            >
+              <Text style={styles.codeText}>{session.shortCode}</Text>
+              <Text style={styles.copyHint}>Tocá para copiar</Text>
+            </Pressable>
+            <Text style={styles.timer}>
+              Expira en {mm}:{ss}
+            </Text>
+          </>
+        )}
       </View>
 
       <Pressable
@@ -223,6 +250,23 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 14,
     fontWeight: '600',
+  },
+  expiredBox: {
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  expiredTitle: {
+    color: colors.danger,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  expiredText: {
+    color: colors.textMuted,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: spacing.md,
   },
   pressed: {
     opacity: 0.85,
