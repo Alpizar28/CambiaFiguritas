@@ -167,8 +167,8 @@ export function AlbumScreen() {
   const safeActiveIndex = Math.min(activeGroupIndex, stickerGroups.length - 1);
   const activeGroup = stickerGroups[safeActiveIndex];
   const activeAccent = getCountryAccent(activeGroup.country.code);
-  const activeAccentTint = tintWithAlpha(activeAccent, 0.35);
-  const activeAccentBg = tintWithAlpha(activeAccent, 0.15);
+  const activeAccentTint = tintWithAlpha(activeAccent, 0.22);
+  const activeAccentBg = tintWithAlpha(activeAccent, 0.07);
   const stats = getStats();
   const activeStats = getGroupStats(activeGroup.stickers, statuses);
 
@@ -360,11 +360,7 @@ export function AlbumScreen() {
   const renderAlbumPage = (page: CountryAlbumPage, pageWidth?: number) => (
     <View
       key={page.pageInCountry}
-      style={[
-        styles.albumPage,
-        !isSpecials && { backgroundColor: activeAccentBg, borderColor: activeAccent },
-        pageWidth != null ? { width: pageWidth } : { alignSelf: 'stretch' },
-      ]}
+      style={[styles.albumPage, pageWidth != null ? { width: pageWidth } : { alignSelf: 'stretch' }]}
     >
       <View style={styles.pageTopline}>
         <Text style={styles.pageLabel}>Pagina {page.pageInCountry}</Text>
@@ -784,7 +780,12 @@ export function AlbumScreen() {
               </View>
             </View>
           ) : (
-            <View style={styles.desktopSpread}>
+            <View
+              style={[
+                styles.desktopSpread,
+                !isSpecials && { backgroundColor: activeAccentBg, borderColor: activeAccent },
+              ]}
+            >
               {pagesToRender.map((p) => renderAlbumPage(p, desktopPageWidth))}
               <View pointerEvents="none" style={styles.bookFold} />
             </View>

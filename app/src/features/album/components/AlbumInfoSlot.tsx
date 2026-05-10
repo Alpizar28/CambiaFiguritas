@@ -18,7 +18,7 @@ type CountryInfoSlotProps = {
 
 export function CountryInfoSlot({ name, group, code, flag }: CountryInfoSlotProps) {
   const accentColor = getCountryAccent(code, colors.primary);
-  const slotBg = tintWithAlpha(accentColor, 0.18);
+  const slotBg = tintWithAlpha(accentColor, 0.10);
 
   return (
     <View style={[styles.slot, styles.countrySlot, { borderColor: accentColor, backgroundColor: slotBg }]}>
@@ -49,7 +49,7 @@ const localizeGroup = (group: string) => group.replace(/^Group\s/i, 'Grupo ');
 export function GroupInfoSlot({ group, countries, activeCountryId, onSelectCountry, accentColor }: GroupInfoSlotProps) {
   const accent = accentColor ?? '#D9272D';
   const headerText = pickReadableTextOn(accent);
-  const bodyBg = tintWithAlpha(accent, 0.18);
+  const bodyBg = tintWithAlpha(accent, 0.10);
 
   return (
     <View style={[styles.slot, styles.groupSlot, { borderColor: accent, backgroundColor: bodyBg }]}>
