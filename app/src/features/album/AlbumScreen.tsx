@@ -167,7 +167,8 @@ export function AlbumScreen() {
   const safeActiveIndex = Math.min(activeGroupIndex, stickerGroups.length - 1);
   const activeGroup = stickerGroups[safeActiveIndex];
   const activeAccent = getCountryAccent(activeGroup.country.code);
-  const activeAccentTint = tintWithAlpha(activeAccent, 0.12);
+  const activeAccentTint = tintWithAlpha(activeAccent, 0.35);
+  const activeAccentBg = tintWithAlpha(activeAccent, 0.15);
   const stats = getStats();
   const activeStats = getGroupStats(activeGroup.stickers, statuses);
 
@@ -325,6 +326,7 @@ export function AlbumScreen() {
           group={activeGroup.country.group}
           countries={getGroupCountries(activeGroup.country.group)}
           activeCountryId={activeGroup.country.id}
+          accentColor={activeAccent}
           onSelectCountry={(countryId) => {
             const idx = stickerGroups.findIndex((g) => g.country.id === countryId);
             if (idx >= 0 && idx !== activeGroupIndex) {
@@ -358,7 +360,11 @@ export function AlbumScreen() {
   const renderAlbumPage = (page: CountryAlbumPage, pageWidth?: number) => (
     <View
       key={page.pageInCountry}
-      style={[styles.albumPage, pageWidth != null ? { width: pageWidth } : { alignSelf: 'stretch' }]}
+      style={[
+        styles.albumPage,
+        !isSpecials && { backgroundColor: activeAccentBg, borderColor: activeAccent },
+        pageWidth != null ? { width: pageWidth } : { alignSelf: 'stretch' },
+      ]}
     >
       <View style={styles.pageTopline}>
         <Text style={styles.pageLabel}>Pagina {page.pageInCountry}</Text>

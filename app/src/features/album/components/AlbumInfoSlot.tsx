@@ -2,7 +2,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii, spacing } from '../../../constants/theme';
 import type { Country } from '../types';
-import { getCountryAccent } from '../utils/countryAccent';
+import { getCountryAccent, pickReadableTextOn, tintWithAlpha } from '../utils/countryAccent';
 
 const IS_WEB = Platform.OS === 'web';
 const noSelect = IS_WEB
@@ -18,9 +18,10 @@ type CountryInfoSlotProps = {
 
 export function CountryInfoSlot({ name, group, code, flag }: CountryInfoSlotProps) {
   const accentColor = getCountryAccent(code, colors.primary);
+  const slotBg = tintWithAlpha(accentColor, 0.18);
 
   return (
-    <View style={[styles.slot, styles.countrySlot, { borderColor: accentColor }]}>
+    <View style={[styles.slot, styles.countrySlot, { borderColor: accentColor, backgroundColor: slotBg }]}>
       <Text style={styles.kicker}>We are</Text>
       <Text numberOfLines={1} style={[styles.countryName, { color: accentColor }]}>{name}</Text>
       <View style={styles.flagRow}>
@@ -40,15 +41,20 @@ type GroupInfoSlotProps = {
   countries: Country[];
   activeCountryId?: string;
   onSelectCountry?: (countryId: string) => void;
+  accentColor?: string;
 };
 
 const localizeGroup = (group: string) => group.replace(/^Group\s/i, 'Grupo ');
 
-export function GroupInfoSlot({ group, countries, activeCountryId, onSelectCountry }: GroupInfoSlotProps) {
+export function GroupInfoSlot({ group, countries, activeCountryId, onSelectCountry, accentColor }: GroupInfoSlotProps) {
+  const accent = accentColor ?? '#D9272D';
+  const headerText = pickReadableTextOn(accent);
+  const bodyBg = tintWithAlpha(accent, 0.18);
+
   return (
-    <View style={[styles.slot, styles.groupSlot]}>
-      <View style={styles.groupHeader}>
-        <Text style={[styles.groupLabel, noSelect]}>{localizeGroup(group)}</Text>
+    <View style={[styles.slot, styles.groupSlot, { borderColor: accent, backgroundColor: bodyBg }]}>
+      <View style={[styles.groupHeader, { backgroundColor: accent }]}>
+        <Text style={[styles.groupLabel, { color: headerText }, noSelect]}>{localizeGroup(group)}</Text>
       </View>
       <View style={styles.groupBody}>
         {countries.map((c) => {
