@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, countryColors, radii, spacing } from '../../../constants/theme';
+import { colors, radii, spacing } from '../../../constants/theme';
+import { getCountryAccent } from '../utils/countryAccent';
 
 type CountryInfoSlotProps = {
   name: string;
@@ -10,7 +11,7 @@ type CountryInfoSlotProps = {
 };
 
 export function CountryInfoSlot({ name, group, code, flag }: CountryInfoSlotProps) {
-  const accentColor = countryColors[code] || colors.primary;
+  const accentColor = getCountryAccent(code, colors.primary);
 
   return (
     <View style={[styles.slot, styles.countrySlot, { borderColor: accentColor }]}>

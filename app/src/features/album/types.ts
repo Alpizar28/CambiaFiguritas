@@ -10,6 +10,8 @@ export type Country = {
   group: string;
   code: string;
   flag?: string;
+  // Colores de bandera para tintar UI (header, pill, info slot).
+  colors?: { primary: string; secondary?: string };
 };
 
 export type Sticker = {

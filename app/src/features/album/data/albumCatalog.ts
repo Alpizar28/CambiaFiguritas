@@ -101,14 +101,21 @@ const countryStickers = countries.flatMap<Sticker>((country) =>
   }),
 );
 
-const specialStickers: Sticker[] = specialCodes.map((displayCode, index) => ({
-  id: displayCode,
-  displayCode,
-  slotNumber: index,
-  kind: 'special',
-  label: displayCode === 'Fifa' ? 'FIFA' : `Especial ${displayCode}`,
-  rarity: 'special',
-}));
+// id interno se mantiene como 'FW1...FW19' para no romper datos guardados en
+// Firestore. displayCode pasa a 'FWC1...FWC19' que es el codigo real impreso
+// en el album Panini (lo que el usuario ve y escribe). El OCR ya conoce el
+// mapeo print FWC -> internal FW (ver scan/ocrParser.ts).
+const specialStickers: Sticker[] = specialCodes.map((internalCode, index) => {
+  const displayCode = internalCode.startsWith('FW') ? `FWC${internalCode.slice(2)}` : internalCode;
+  return {
+    id: internalCode,
+    displayCode,
+    slotNumber: index,
+    kind: 'special',
+    label: displayCode === 'Fifa' ? 'FIFA' : `Especial ${displayCode}`,
+    rarity: 'special',
+  };
+});
 
 export const allStickers = specialStickers.concat(countryStickers);
 

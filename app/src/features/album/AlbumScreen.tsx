@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { radii, spacing } from '../../constants/theme';
+import { getCountryAccent, pickReadableTextOn, tintWithAlpha } from './utils/countryAccent';
 import { useAlbumStore } from '../../store/albumStore';
 import { CountryInfoSlot, GroupInfoSlot } from './components/AlbumInfoSlot';
 import { AlbumProgress } from './components/AlbumProgress';
@@ -50,12 +51,18 @@ stickerGroups.forEach((group, groupIndex) => {
   });
 });
 
-// Detecta búsqueda por código directo: "ARG12", "FW1", "12 argentina", "argentina 12"
+// Detecta búsqueda por código directo: "ARG12", "FWC1", "12 argentina", "argentina 12"
 function parseDirectCode(rawQuery: string): { sticker: Sticker; groupIndex: number } | null {
   const q = rawQuery.trim().toLowerCase();
   if (q.length < 2) return null;
   const direct = stickersByCode.get(q);
   if (direct) return direct;
+  // Alias: si el user escribe "fw1" (codigo interno viejo), redirigir a "fwc1"
+  // que es el codigo real impreso en el album.
+  if (/^fw\d+$/.test(q)) {
+    const aliased = stickersByCode.get(`fwc${q.slice(2)}`);
+    if (aliased) return aliased;
+  }
   // "12 argentina" o "argentina 12": split en palabras + número
   const numMatch = q.match(/^(.+?)\s+(\d{1,3})$|^(\d{1,3})\s+(.+)$/);
   if (!numMatch) return null;
@@ -148,6 +155,8 @@ export function AlbumScreen() {
   const getStats = useAlbumStore((state) => state.getStats);
 
   const activeGroup = stickerGroups[activeGroupIndex];
+  const activeAccent = getCountryAccent(activeGroup.country.code);
+  const activeAccentTint = tintWithAlpha(activeAccent, 0.12);
   const stats = getStats();
   const activeStats = getGroupStats(activeGroup.stickers, statuses);
 
@@ -194,7 +203,7 @@ export function AlbumScreen() {
     });
   }, [activeGroupIndex, width]);
 
-  // Búsqueda directa por código: "ARG12", "FW1", "12 argentina"
+  // Búsqueda directa por código: "ARG12", "FWC1", "12 argentina"
   // Si hay match exacto: salta al país + highlight 2.5s
   useEffect(() => {
     const direct = parseDirectCode(normalizedQuery);
@@ -357,10 +366,15 @@ export function AlbumScreen() {
           position="top"
         />
         {/* Header compacto sticky */}
-        <View style={styles.mobileHeader}>
+        <View
+          style={[
+            styles.mobileHeader,
+            { backgroundColor: activeAccentTint, borderBottomColor: activeAccent, borderBottomWidth: 2 },
+          ]}
+        >
           <View style={styles.mobileTitleRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.mobileKicker}>Album Mundial 2026</Text>
+              <Text style={[styles.mobileKicker, { color: activeAccent }]}>Album Mundial 2026</Text>
               <Text style={styles.mobileTitle} numberOfLines={1}>
                 {activeGroup.country.flag ? `${activeGroup.country.flag} ` : ''}{activeGroup.country.name}
               </Text>
@@ -484,6 +498,8 @@ export function AlbumScreen() {
                 const isActive = index === activeGroupIndex;
                 const groupStats = getGroupStats(group.stickers, statuses);
                 const isComplete = groupStats.total > 0 && groupStats.owned === groupStats.total;
+                const groupAccent = getCountryAccent(group.country.code);
+                const activeText = pickReadableTextOn(groupAccent);
                 return (
                   <Pressable
                     key={group.country.id}
@@ -491,14 +507,27 @@ export function AlbumScreen() {
                     style={[
                       styles.countryButton,
                       isActive && styles.countryButtonActive,
+                      isActive && { backgroundColor: groupAccent, borderColor: groupAccent },
                       isComplete && !isActive && styles.countryButtonComplete,
                     ]}
                   >
                     {isComplete && <Text style={styles.completeBadge}>✓</Text>}
-                    <Text style={[styles.countryButtonText, isActive && styles.countryButtonTextActive]}>
+                    <Text
+                      style={[
+                        styles.countryButtonText,
+                        isActive && styles.countryButtonTextActive,
+                        isActive && { color: activeText },
+                      ]}
+                    >
                       {group.country.code}
                     </Text>
-                    <Text style={[styles.countryProgress, isActive && styles.countryProgressActive]}>
+                    <Text
+                      style={[
+                        styles.countryProgress,
+                        isActive && styles.countryProgressActive,
+                        isActive && { color: activeText, opacity: 0.85 },
+                      ]}
+                    >
                       {groupStats.owned}/{groupStats.total}
                     </Text>
                   </Pressable>
@@ -571,9 +600,14 @@ export function AlbumScreen() {
       />
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.workspace}>
-          <View style={styles.toolbar}>
+          <View
+            style={[
+              styles.toolbar,
+              { backgroundColor: activeAccentTint, borderLeftColor: activeAccent, borderLeftWidth: 4 },
+            ]}
+          >
             <View style={styles.titleBlock}>
-              <Text style={styles.kicker}>Album Mundial 2026</Text>
+              <Text style={[styles.kicker, { color: activeAccent }]}>Album Mundial 2026</Text>
               <Text style={styles.title}>{activeGroup.country.flag ? `${activeGroup.country.flag} ` : ''}{activeGroup.country.name}</Text>
               <Text style={styles.subtitle}>
                 {activeGroup.country.group} · {activeStats.owned}/{activeStats.total} ·{' '}
