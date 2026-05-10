@@ -1,4 +1,4 @@
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii, spacing } from '../../../constants/theme';
 import type { Country } from '../types';
@@ -39,11 +39,12 @@ type GroupInfoSlotProps = {
   group: string;
   countries: Country[];
   activeCountryId?: string;
+  onSelectCountry?: (countryId: string) => void;
 };
 
 const localizeGroup = (group: string) => group.replace(/^Group\s/i, 'Grupo ');
 
-export function GroupInfoSlot({ group, countries, activeCountryId }: GroupInfoSlotProps) {
+export function GroupInfoSlot({ group, countries, activeCountryId, onSelectCountry }: GroupInfoSlotProps) {
   return (
     <View style={[styles.slot, styles.groupSlot]}>
       <View style={styles.groupHeader}>
@@ -53,15 +54,22 @@ export function GroupInfoSlot({ group, countries, activeCountryId }: GroupInfoSl
         {countries.map((c) => {
           const isActive = c.id === activeCountryId;
           return (
-            <View
+            <Pressable
               key={c.id}
-              style={[styles.groupRow, isActive && styles.groupRowActive]}
+              accessibilityLabel={`Ir a ${c.name}`}
+              onPress={() => onSelectCountry?.(c.id)}
+              disabled={!onSelectCountry || isActive}
+              style={({ pressed }) => [
+                styles.groupRow,
+                isActive && styles.groupRowActive,
+                pressed && !isActive && styles.groupRowPressed,
+              ]}
             >
               <Text style={[styles.groupRowFlag, noSelect]}>{c.flag}</Text>
               <Text style={[styles.groupRowCode, isActive && styles.groupRowCodeActive, noSelect]}>
                 {c.code}
               </Text>
-            </View>
+            </Pressable>
           );
         })}
       </View>
@@ -89,42 +97,46 @@ const styles = StyleSheet.create({
     borderColor: '#A81E22',
     borderWidth: 2,
     flexBasis: '23.5%',
-    minHeight: 150,
+    minHeight: 118,
     overflow: 'hidden',
     padding: 0,
   },
   groupHeader: {
     alignItems: 'center',
     backgroundColor: '#D9272D',
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
   groupBody: {
     flex: 1,
     justifyContent: 'space-around',
-    paddingHorizontal: 4,
-    paddingVertical: 4,
+    paddingHorizontal: 3,
+    paddingVertical: 3,
   },
   groupRow: {
     alignItems: 'center',
     borderRadius: radii.sm,
     flexDirection: 'row',
-    gap: 6,
+    gap: 5,
     justifyContent: 'center',
-    paddingHorizontal: 4,
-    paddingVertical: 3,
+    paddingHorizontal: 3,
+    paddingVertical: 2,
   },
   groupRowActive: {
     backgroundColor: '#FFF4D6',
     borderColor: '#E8B400',
     borderWidth: 1,
   },
+  groupRowPressed: {
+    backgroundColor: '#F0E8D8',
+    transform: [{ scale: 0.96 }],
+  },
   groupRowFlag: {
-    fontSize: 18,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 17,
   },
   groupRowCode: {
     color: '#1A1A1A',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
@@ -171,7 +183,7 @@ const styles = StyleSheet.create({
   },
   groupLabel: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '900',
     textAlign: 'center',
     textTransform: 'uppercase',

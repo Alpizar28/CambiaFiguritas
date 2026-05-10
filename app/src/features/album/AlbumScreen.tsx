@@ -325,6 +325,13 @@ export function AlbumScreen() {
           group={activeGroup.country.group}
           countries={getGroupCountries(activeGroup.country.group)}
           activeCountryId={activeGroup.country.id}
+          onSelectCountry={(countryId) => {
+            const idx = stickerGroups.findIndex((g) => g.country.id === countryId);
+            if (idx >= 0 && idx !== activeGroupIndex) {
+              haptic.tap();
+              setActiveGroupIndex(idx);
+            }
+          }}
         />
       );
     }
