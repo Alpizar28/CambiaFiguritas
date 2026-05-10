@@ -16,6 +16,7 @@ import { db } from '../../services/firebase';
 import { loadOtherUserAlbum } from '../../services/albumSyncService';
 import { useUserStore } from '../../store/userStore';
 import { useAlbumStore } from '../../store/albumStore';
+import { useTradeStore } from '../../store/tradeStore';
 import { track } from '../../services/analytics';
 import { formatDistance, haversineKm } from '../../utils/distance';
 import { colors, radii, spacing } from '../../constants/theme';
@@ -158,6 +159,14 @@ export function MatchProfileScreen({ route, navigation }: Props) {
         ) : null}
 
         <View style={styles.actionsRow}>
+          <ActionButton
+            label="En persona"
+            color={colors.primary}
+            onPress={() => {
+              track({ name: 'match_trade_entrypoint_profile', params: { matchUid: user.uid } });
+              useTradeStore.getState().openModal({ kind: 'home' });
+            }}
+          />
           <ActionButton
             label="WhatsApp"
             color="#25D366"

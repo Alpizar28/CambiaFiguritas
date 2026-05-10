@@ -165,6 +165,102 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // tradeSessions: sesiones de intercambio presencial entre dos usuarios.
+    // Documento transitorio (expira en ~10 min). Pareo via shortCode + QR.
+    // Reglas:
+    //   - read: cualquier signed-in (necesario para query de join por shortCode).
+    //     El contenido es transitorio y de bajo riesgo (no datos sensibles).
+    //   - create: solo el host de la sesión, con status inicial waiting,
+    //     guestUid null y expiresAt acotado a now + 11 min.
+    //   - update: solo participantes (host o guest); cada lado sólo puede tocar
+    //     sus propios campos. hostUid, guestUid, shortCode, createdAt, expiresAt
+    //     y tradeId son inmutables client-side. Setear guestUid (join) y commit
+    //     final corren via Cloud Function callable (admin SDK).
+    //   - delete: deshabilitado.
+    match /tradeSessions/{sessionId} {
+      allow read: if isSignedIn();
+      // create: ahora la sesión nace via Cloud Function `createTradeSession`
+      // (admin SDK), por lo que la creación client-side queda bloqueada.
+      // Mantenemos la validación de shape para defensa en profundidad si
+      // alguien intentara escribir directamente.
+      allow create: if isSignedIn()
+                    && request.resource.data.hostUid == request.auth.uid
+                    && request.resource.data.guestUid == null
+                    && request.resource.data.status == 'waiting'
+                    && request.resource.data.shortCode is string
+                    && request.resource.data.shortCode.size() == 6
+                    && request.resource.data.hostName is string
+                    && request.resource.data.hostName.size() <= 80
+                    && (request.resource.data.hostPhotoUrl == null ||
+                        request.resource.data.hostPhotoUrl is string)
+                    && request.resource.data.hostStickers is list
+                    && request.resource.data.hostStickers.size() <= 200
+                    && request.resource.data.guestStickers is list
+                    && request.resource.data.guestStickers.size() == 0
+                    && request.resource.data.createdAt is number
+                    && request.resource.data.createdAt <= request.time.toMillis()
+                    && request.resource.data.expiresAt is number
+                    && request.resource.data.expiresAt <= request.time.toMillis() + 11 * 60 * 1000
+                    && request.resource.data.expiresAt > request.time.toMillis()
+                    && request.resource.data.tradeId == null;
+      allow update: if isSignedIn()
+                    && (request.auth.uid == resource.data.hostUid ||
+                        request.auth.uid == resource.data.guestUid)
+                    && request.resource.data.hostUid == resource.data.hostUid
+                    && request.resource.data.guestUid == resource.data.guestUid
+                    && request.resource.data.shortCode == resource.data.shortCode
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.expiresAt == resource.data.expiresAt
+                    && request.resource.data.tradeId == resource.data.tradeId
+                    && request.resource.data.status in ['selecting', 'paired',
+                                                          'host_confirmed', 'guest_confirmed',
+                                                          'cancelled']
+                    // Transition guard: estados terminales no se pueden revivir
+                    // y no se permite retroceder de host_/guest_confirmed a selecting/paired.
+                    && resource.data.status != 'cancelled'
+                    && resource.data.status != 'completed'
+                    && resource.data.status != 'expired'
+                    && !(resource.data.status == 'host_confirmed'
+                          && request.resource.data.status in ['selecting', 'paired'])
+                    && !(resource.data.status == 'guest_confirmed'
+                          && request.resource.data.status in ['selecting', 'paired'])
+                    && (
+                      // Host edita sólo su lado.
+                      (request.auth.uid == resource.data.hostUid
+                        && request.resource.data.guestStickers == resource.data.guestStickers
+                        && request.resource.data.guestConfirmedAt == resource.data.guestConfirmedAt
+                        && request.resource.data.hostStickers is list
+                        && request.resource.data.hostStickers.size() <= 200)
+                      ||
+                      // Guest edita sólo su lado.
+                      (request.auth.uid == resource.data.guestUid
+                        && request.resource.data.hostStickers == resource.data.hostStickers
+                        && request.resource.data.hostConfirmedAt == resource.data.hostConfirmedAt
+                        && request.resource.data.guestStickers is list
+                        && request.resource.data.guestStickers.size() <= 200)
+                    );
+      allow delete: if false;
+    }
+
+    // Locks transitorios para reserva atómica de shortCode y sesión activa
+    // por usuario. Backend-only (admin SDK).
+    match /tradeShortCodes/{shortCode} {
+      allow read, write: if false;
+    }
+    match /tradeUserLocks/{uid} {
+      allow read, write: if false;
+    }
+
+    // trades: historial inmutable de intercambios completados.
+    // Lectura solo participantes. Escritura solo backend (Cloud Function commitTradeSession).
+    match /trades/{tradeId} {
+      allow read: if isSignedIn() && (
+                    resource.data.uidA == request.auth.uid ||
+                    resource.data.uidB == request.auth.uid
+                  );
+      allow write: if false;
+    }
+
     // Por defecto, todo lo demás bloqueado.
     match /{document=**} {
       allow read, write: if false;

@@ -9,16 +9,18 @@ import './firebase'; // ensure firebase app is initialized
 // antes de mandarse a Analytics. Esto evita exponer identificadores cruzados.
 // El UID propio del usuario logueado se manda con setUserId (es atribución
 // first-party permitida por GA4).
-const HASH_KEYS = new Set(['matchUid', 'targetUid']);
+// Identificadores transitorios de trade (sessionId, tradeId, shortCode) también
+// se hashean para no exponer códigos de pareo crudos al backend de analytics.
+const HASH_KEYS = new Set(['matchUid', 'targetUid', 'sessionId', 'tradeId', 'shortCode']);
 const hashCache = new Map<string, string>();
 
-async function hashUid(uid: string): Promise<string> {
-  const cached = hashCache.get(uid);
+async function hashId(id: string): Promise<string> {
+  const cached = hashCache.get(id);
   if (cached) return cached;
   try {
-    const full = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, uid);
+    const full = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, id);
     const short = full.slice(0, 12);
-    hashCache.set(uid, short);
+    hashCache.set(id, short);
     return short;
   } catch {
     return 'h_unknown';
@@ -29,7 +31,7 @@ async function redactParams(params: Record<string, unknown>): Promise<Record<str
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(params)) {
     if (HASH_KEYS.has(key) && typeof value === 'string') {
-      out[key] = await hashUid(value);
+      out[key] = await hashId(value);
     } else {
       out[key] = value;
     }
@@ -110,7 +112,14 @@ type AnalyticsEvent =
   | { name: 'scan_no_match' }
   | { name: 'scan_confirmed'; params: { added: number; incremented: number } }
   | { name: 'scan_dismissed' }
-  | { name: 'scan_manual_entry'; params: { matched: boolean } };
+  | { name: 'scan_manual_entry'; params: { matched: boolean } }
+  | { name: 'trade_session_created'; params: { sessionId: string } }
+  | { name: 'match_trade_entrypoint_profile'; params: { matchUid: string } }
+  | { name: 'trade_joined'; params: { sessionId: string } }
+  | { name: 'trade_confirmed'; params: { sessionId: string; role: 'host' | 'guest'; givesCount: number; receivesCount: number } }
+  | { name: 'trade_completed'; params: { sessionId: string; tradeId: string; givesCount: number; receivesCount: number } }
+  | { name: 'trade_cancelled'; params: { sessionId: string; reason: string } }
+  | { name: 'trade_commit_failed'; params: { sessionId: string; reason: string } };
 
 let analyticsInstance: Analytics | null = null;
 let initPromise: Promise<Analytics | null> | null = null;
