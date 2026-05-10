@@ -99,6 +99,16 @@ const getGroupStats = (stickers: Sticker[], statuses: Record<string, StickerStat
   return { total: stickers.length, owned, repeated };
 };
 
+// "Tengo" engloba owned + repeated + special: no se puede tener repetida sin
+// poseer la base, así que el filtro debe coincidir con el contador de getGroupStats.
+const matchesAlbumFilter = (status: StickerStatus, filter: AlbumFilter): boolean => {
+  if (filter === 'all') return true;
+  if (filter === 'owned') {
+    return status === 'owned' || status === 'repeated' || status === 'special';
+  }
+  return status === filter;
+};
+
 const COUNTRY_BTN_WIDTH = 70;
 
 export function AlbumScreen() {
@@ -171,8 +181,7 @@ export function AlbumScreen() {
     () =>
       activeGroup.stickers.filter((sticker) => {
         const status = statuses[sticker.id] ?? 'missing';
-        const matchesFilter = activeFilter === 'all' || status === activeFilter;
-        return matchesFilter && matchesQuery(sticker, effectiveQuery);
+        return matchesAlbumFilter(status, activeFilter) && matchesQuery(sticker, effectiveQuery);
       }),
     [activeGroup, statuses, activeFilter, effectiveQuery],
   );
@@ -283,8 +292,7 @@ export function AlbumScreen() {
 
   const shouldShowSticker = (sticker: Sticker) => {
     const status = statuses[sticker.id] ?? 'missing';
-    const matchesFilter = activeFilter === 'all' || status === activeFilter;
-    return matchesFilter && matchesQuery(sticker, effectiveQuery);
+    return matchesAlbumFilter(status, activeFilter) && matchesQuery(sticker, effectiveQuery);
   };
 
   const renderSlot = (slot: AlbumSlot, index: number) => {
