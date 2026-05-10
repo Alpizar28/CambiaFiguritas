@@ -186,7 +186,10 @@ export function AlbumScreen() {
     setShareModalOpen(true);
   };
   const normalizedQuery = query.trim().toLowerCase();
-  const isSpecials = activeGroup.country.id === 'especiales';
+  // 'especiales' (FW) y 'cocacola' (CC) usan grid plano, sin layout 2-paginas.
+  const isSpecials = activeGroup.country.id === 'especiales' || activeGroup.country.id === 'cocacola';
+  // Toggle Coca-Cola solo se ofrece desde la pestania Especiales (no desde CC).
+  const showCocaToggle = activeGroup.country.id === 'especiales';
 
   // Si query matchea metadata del país activo (nombre/código/grupo),
   // mostrar todas las figuritas del país en vez de filtrar individualmente.
@@ -431,7 +434,7 @@ export function AlbumScreen() {
             <View style={[styles.mobileProgressFill, { width: `${Math.min(100, Math.max(0, stats.progress))}%` as any }]} />
           </View>
 
-          {isSpecials && (
+          {showCocaToggle && (
             <Pressable
               onPress={() => { haptic.tap(); setIncludeCocaCola(!includeCocaCola); }}
               style={styles.cocaToggleRow}
@@ -648,6 +651,20 @@ export function AlbumScreen() {
                 {activeGroup.country.group} · {activeStats.owned}/{activeStats.total} ·{' '}
                 {activeStats.repeated} repetidas
               </Text>
+              {showCocaToggle && (
+                <Pressable
+                  onPress={() => setIncludeCocaCola(!includeCocaCola)}
+                  style={[styles.cocaToggleRow, styles.cocaToggleDesktop]}
+                  accessibilityLabel="Incluir subcoleccion Coca-Cola"
+                >
+                  <Text style={styles.cocaToggleText} numberOfLines={1}>
+                    Coca-Cola (12) — {includeCocaCola ? 'incluida' : 'no incluida'}
+                  </Text>
+                  <View style={[styles.cocaSwitch, includeCocaCola && styles.cocaSwitchOn]}>
+                    <View style={[styles.cocaSwitchKnob, includeCocaCola && styles.cocaSwitchKnobOn]} />
+                  </View>
+                </Pressable>
+              )}
             </View>
             <View style={styles.progressWrap}>
               <AlbumProgress {...stats} />
@@ -1017,6 +1034,13 @@ const styles = StyleSheet.create({
   },
   cocaSwitchKnobOn: {
     alignSelf: 'flex-end',
+  },
+  cocaToggleDesktop: {
+    marginHorizontal: 0,
+    marginTop: spacing.sm,
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   mobileScroll: {
     flex: 1,
