@@ -1,8 +1,11 @@
 import { memo, useCallback } from 'react';
+import { Platform } from 'react-native';
 import { useAlbumStore } from '../../../store/albumStore';
 import { useWishlistStore } from '../../../store/wishlistStore';
 import { StickerCard } from './StickerCard';
 import type { Sticker } from '../types';
+
+const IS_WEB = Platform.OS === 'web';
 
 type Props = {
   sticker: Sticker;
@@ -35,6 +38,15 @@ function ConnectedStickerCardImpl({ sticker, colSpan, highlighted, onLongPress }
     (event: { nativeEvent: { pageX: number; pageY: number } }) => onLongPress(stickerId, event),
     [onLongPress, stickerId],
   );
+  const handleContextMenu = useCallback(
+    (e: { preventDefault?: () => void; pageX?: number; pageY?: number }) => {
+      e.preventDefault?.();
+      onLongPress(stickerId, {
+        nativeEvent: { pageX: e.pageX ?? 0, pageY: e.pageY ?? 0 },
+      });
+    },
+    [onLongPress, stickerId],
+  );
 
   return (
     <StickerCard
@@ -47,6 +59,7 @@ function ConnectedStickerCardImpl({ sticker, colSpan, highlighted, onLongPress }
       onPress={handlePress}
       onDoublePress={handleDoublePress}
       onLongPress={handleLongPress}
+      onContextMenu={IS_WEB ? handleContextMenu : undefined}
       onIncrementRepeated={handleIncrement}
       onDecrementRepeated={handleDecrement}
     />
@@ -57,7 +70,9 @@ export const ConnectedStickerCard = memo(ConnectedStickerCardImpl, (prev, next) 
   prev.sticker.id === next.sticker.id &&
   prev.colSpan === next.colSpan &&
   prev.highlighted === next.highlighted &&
-  prev.onLongPress === next.onLongPress,
+  prev.onLongPress === next.onLongPress &&
+  prev.sticker.displayCode === next.sticker.displayCode &&
+  prev.sticker.label === next.sticker.label,
 );
 // Nota: status, repeatedCount y wishlisted son consumidos via useAlbumStore/useWishlistStore
 // con selectors específicos del sticker. Cada cambio de un sticker solo re-renderiza ese item.

@@ -1,9 +1,16 @@
 import { memo, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { radii, spacing } from '../../../constants/theme';
 import { formatStickerNumber } from '../data/albumCatalog';
 import type { Sticker, StickerStatus } from '../types';
+
+const IS_WEB = Platform.OS === 'web';
+// userSelect/WebkitUserSelect no estan en ViewStyle pero RN-web los aplica.
+// Cast a any para evitar TS strict en build nativo.
+const noSelect = IS_WEB
+  ? ({ userSelect: 'none', WebkitUserSelect: 'none' } as any)
+  : null;
 
 type StickerCardProps = {
   sticker: Sticker;
@@ -15,6 +22,7 @@ type StickerCardProps = {
   onPress: () => void;
   onDoublePress: () => void;
   onLongPress: (event: { nativeEvent: { pageX: number; pageY: number } }) => void;
+  onContextMenu?: (e: { preventDefault?: () => void; pageX?: number; pageY?: number }) => void;
   onIncrementRepeated?: () => void;
   onDecrementRepeated?: () => void;
 };
@@ -36,6 +44,7 @@ function StickerCardImpl({
   onPress,
   onDoublePress,
   onLongPress,
+  onContextMenu,
   onIncrementRepeated,
   onDecrementRepeated,
 }: StickerCardProps) {
@@ -74,6 +83,8 @@ function StickerCardImpl({
       }`}
       onPress={handlePress}
       onLongPress={(event) => onLongPress(event)}
+      delayLongPress={350}
+      {...((IS_WEB && onContextMenu ? { onContextMenu } : {}) as object)}
       style={({ pressed }) => [
         styles.card,
         colSpan === 2
@@ -84,20 +95,21 @@ function StickerCardImpl({
         variantStyle,
         pressed && styles.pressed,
         highlighted && styles.highlighted,
+        noSelect,
       ]}
     >
       <View style={styles.topRow}>
-        <Text style={[styles.number, status === 'missing' && styles.numberMissing]}>
+        <Text style={[styles.number, status === 'missing' && styles.numberMissing, noSelect]}>
           {formatStickerNumber(sticker.displayCode)}
         </Text>
         <View style={[styles.statusChip, styles[`${status}Chip`]]}>
-          <Text style={[styles.statusChipText, status === 'missing' && styles.statusChipTextMissing]}>
+          <Text style={[styles.statusChipText, status === 'missing' && styles.statusChipTextMissing, noSelect]}>
             {STATUS_COPY[status]}
           </Text>
         </View>
       </View>
 
-      <Text numberOfLines={1} style={[styles.label, status === 'missing' && styles.labelMissing]}>
+      <Text numberOfLines={1} style={[styles.label, status === 'missing' && styles.labelMissing, noSelect]}>
         {sticker.label}
       </Text>
 
@@ -132,6 +144,7 @@ export const StickerCard = memo(StickerCardImpl, (prev, next) =>
   prev.onPress === next.onPress &&
   prev.onDoublePress === next.onDoublePress &&
   prev.onLongPress === next.onLongPress &&
+  prev.onContextMenu === next.onContextMenu &&
   prev.onIncrementRepeated === next.onIncrementRepeated &&
   prev.onDecrementRepeated === next.onDecrementRepeated,
 );

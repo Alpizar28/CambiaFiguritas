@@ -16,8 +16,6 @@ import { getCountryAccent, pickReadableTextOn, tintWithAlpha } from './utils/cou
 import { useAlbumStore } from '../../store/albumStore';
 import { CountryInfoSlot, GroupInfoSlot } from './components/AlbumInfoSlot';
 import { AlbumProgress } from './components/AlbumProgress';
-import { ContextMenu } from './components/ContextMenu';
-import { RepeatCounterMenu } from './components/RepeatCounterMenu';
 import { ConnectedStickerCard } from './components/ConnectedStickerCard';
 import { StickerActionSheet } from './components/StickerActionSheet';
 import { allStickers, cocaColaStickerGroup, countryStickerGroups, specialStickerGroup } from './data/albumCatalog';
@@ -130,15 +128,7 @@ export function AlbumScreen() {
   const [activeFilter, setActiveFilter] = useState<AlbumFilter>('all');
   const [highlightedStickerId, setHighlightedStickerId] = useState<string | null>(null);
 
-  // Para desktop (menú flotante)
-  const [menuState, setMenuState] = useState<{
-    open: boolean;
-    stickerId: string;
-    position: { x: number; y: number };
-    type: 'context' | 'counter';
-  } | null>(null);
-
-  // Para mobile (bottom sheet)
+  // Bottom sheet unico para web y mobile.
   const [sheetStickerId, setSheetStickerId] = useState<string | null>(null);
 
   const countryScrollerRef = useRef<ScrollView>(null);
@@ -295,27 +285,15 @@ export function AlbumScreen() {
   };
 
   const handleLongPress = useCallback(
-    (stickerId: string, event: { nativeEvent: { pageX: number; pageY: number } }) => {
+    (stickerId: string, _event: { nativeEvent: { pageX: number; pageY: number } }) => {
       haptic.medium();
-      if (isDesktop) {
-        const state = useAlbumStore.getState();
-        const status = state.statuses[stickerId] ?? 'missing';
-        const repeatedCount = state.repeatedCounts[stickerId] ?? 0;
-        const hasRepeated = status === 'repeated' || repeatedCount > 0;
-        setMenuState({
-          open: true,
-          stickerId,
-          position: { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY },
-          type: hasRepeated ? 'counter' : 'context',
-        });
-      } else {
-        setSheetStickerId(stickerId);
-      }
+      // Bottom sheet unico para web y mobile. Long-press y context-menu (web)
+      // pasan por aca.
+      setSheetStickerId(stickerId);
     },
-    [isDesktop],
+    [],
   );
 
-  const closeMenu = () => setMenuState(null);
   const closeSheet = () => setSheetStickerId(null);
 
   const handleSelectStatus = (stickerId: string, status: StickerStatus) => {
@@ -791,29 +769,21 @@ export function AlbumScreen() {
             </View>
           )}
 
-          {menuState && menuState.type === 'context' && (
-            <ContextMenu
-              status={statuses[menuState.stickerId] ?? 'missing'}
-              repeatedCount={repeatedCounts[menuState.stickerId] ?? 0}
-              position={menuState.position}
-              onSelectStatus={(status) => handleSelectStatus(menuState.stickerId, status)}
-              onClose={closeMenu}
-            />
-          )}
-
-          {menuState && menuState.type === 'counter' && (
-            <RepeatCounterMenu
-              repeatedCount={repeatedCounts[menuState.stickerId] ?? 0}
-              onIncrement={() => incrementRepeated(menuState.stickerId)}
-              onDecrement={() => decrementRepeated(menuState.stickerId)}
-              onClose={closeMenu}
-            />
-          )}
         </View>
       </ScrollView>
       <ShareCardModal visible={shareModalOpen} onClose={() => setShareModalOpen(false)} />
       {/* ScanFab oculto temporalmente */}
       <ScanScreen visible={scanOpen} onClose={() => setScanOpen(false)} />
+      <StickerActionSheet
+        visible={!!sheetSticker}
+        sticker={sheetSticker}
+        status={sheetStickerId ? statuses[sheetStickerId] ?? 'missing' : 'missing'}
+        repeatedCount={sheetStickerId ? repeatedCounts[sheetStickerId] ?? 0 : 0}
+        onSelectStatus={(s) => sheetStickerId && handleSelectStatus(sheetStickerId, s)}
+        onIncrement={() => sheetStickerId && incrementRepeated(sheetStickerId)}
+        onDecrement={() => sheetStickerId && decrementRepeated(sheetStickerId)}
+        onClose={closeSheet}
+      />
     </View>
   );
 }
