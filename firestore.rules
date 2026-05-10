@@ -215,15 +215,19 @@ service cloud.firestore {
                     && request.resource.data.status in ['selecting', 'paired',
                                                           'host_confirmed', 'guest_confirmed',
                                                           'cancelled']
-                    // Transition guard: estados terminales no se pueden revivir
-                    // y no se permite retroceder de host_/guest_confirmed a selecting/paired.
+                    // Transition guard: estados terminales no se pueden revivir.
+                    // Cada lado sí puede deshacer SU propia confirmación
+                    // (host_confirmed → selecting solo si lo hace el host;
+                    //  guest_confirmed → selecting solo si lo hace el guest).
                     && resource.data.status != 'cancelled'
                     && resource.data.status != 'completed'
                     && resource.data.status != 'expired'
                     && !(resource.data.status == 'host_confirmed'
-                          && request.resource.data.status in ['selecting', 'paired'])
+                          && request.resource.data.status in ['selecting', 'paired']
+                          && request.auth.uid != resource.data.hostUid)
                     && !(resource.data.status == 'guest_confirmed'
-                          && request.resource.data.status in ['selecting', 'paired'])
+                          && request.resource.data.status in ['selecting', 'paired']
+                          && request.auth.uid != resource.data.guestUid)
                     && (
                       // Host edita sólo su lado.
                       (request.auth.uid == resource.data.hostUid
