@@ -61,12 +61,6 @@ export function GroupInfoSlot({ group, countries, activeCountryId }: GroupInfoSl
               <Text style={[styles.groupRowCode, isActive && styles.groupRowCodeActive, noSelect]}>
                 {c.code}
               </Text>
-              <Text
-                numberOfLines={1}
-                style={[styles.groupRowName, isActive && styles.groupRowNameActive, noSelect]}
-              >
-                {c.name}
-              </Text>
             </View>
           );
         })}
@@ -114,9 +108,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: radii.sm,
     flexDirection: 'row',
-    gap: 4,
+    gap: 6,
+    justifyContent: 'center',
     paddingHorizontal: 4,
-    paddingVertical: 2,
+    paddingVertical: 3,
   },
   groupRowActive: {
     backgroundColor: '#FFF4D6',
@@ -124,28 +119,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   groupRowFlag: {
-    fontSize: 14,
-    lineHeight: 16,
+    fontSize: 18,
+    lineHeight: 20,
   },
   groupRowCode: {
     color: '#1A1A1A',
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 0.3,
-    minWidth: 22,
+    letterSpacing: 0.5,
   },
   groupRowCodeActive: {
     color: '#A87600',
-  },
-  groupRowName: {
-    color: '#3A352B',
-    flex: 1,
-    fontSize: 8,
-    fontWeight: '700',
-  },
-  groupRowNameActive: {
-    color: '#A87600',
-    fontWeight: '900',
   },
   kicker: {
     color: '#8B6F47',
