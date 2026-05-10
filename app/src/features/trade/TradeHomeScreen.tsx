@@ -10,6 +10,7 @@ import { createSession, findActiveSessionForUser, TradeError } from '../../servi
 import { track } from '../../services/analytics';
 import { colors, radii, spacing } from '../../constants/theme';
 import type { TradeStackParamList } from '../../types/navigation';
+import { QRScanner } from './components/QRScanner';
 
 export function TradeHomeScreen() {
   const insets = useSafeAreaInsets();
@@ -18,6 +19,7 @@ export function TradeHomeScreen() {
   const demoMode = useUserStore((s) => s.demoMode);
   const closeTradeModal = useTradeStore((s) => s.closeModal);
   const [busy, setBusy] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const handleCreate = useCallback(async () => {
     if (!user || demoMode) {
@@ -55,6 +57,26 @@ export function TradeHomeScreen() {
     }
     navigation.navigate('TradeJoin', {});
   }, [user, demoMode, navigation]);
+
+  const handleScan = useCallback(() => {
+    if (!user || demoMode) {
+      Alert.alert('Iniciá sesión', 'Necesitás una cuenta para usar intercambio presencial.');
+      return;
+    }
+    setScannerOpen(true);
+  }, [user, demoMode]);
+
+  const handleScanResult = useCallback((raw: string) => {
+    const match = raw.match(/\/trade\/([A-Z0-9]{6})/i);
+    if (!match?.[1]) {
+      Alert.alert('QR inválido', 'Escaneá el QR de intercambio de CambiaFiguritas.');
+      return;
+    }
+    const code = match[1].toUpperCase();
+    setScannerOpen(false);
+    track({ name: 'trade_qr_scanned', params: { code } });
+    navigation.navigate('TradeJoin', { prefilledCode: code });
+  }, [navigation]);
 
   return (
     <ScrollView
@@ -96,6 +118,14 @@ export function TradeHomeScreen() {
         </Pressable>
 
         <Pressable
+          onPress={handleScan}
+          style={({ pressed }) => [styles.cta, styles.ctaSecondary, pressed && styles.pressed]}
+        >
+          <Text style={[styles.ctaTitle, styles.ctaTitleSecondary]}>Escanear QR</Text>
+          <Text style={[styles.ctaSub, styles.ctaSubSecondary]}>Apuntá al QR del otro coleccionista.</Text>
+        </Pressable>
+
+        <Pressable
           onPress={handleJoin}
           style={({ pressed }) => [styles.cta, styles.ctaSecondary, pressed && styles.pressed]}
         >
@@ -107,10 +137,14 @@ export function TradeHomeScreen() {
       <View style={styles.howWrap}>
         <Text style={styles.howTitle}>Cómo funciona</Text>
         <Text style={styles.howStep}>1. Uno crea la sesión y muestra el QR.</Text>
-        <Text style={styles.howStep}>2. El otro escanea o tipea el código.</Text>
+        <Text style={styles.howStep}>2. El otro escanea el QR o tipea el código.</Text>
         <Text style={styles.howStep}>3. Cada uno marca qué figu da y qué recibe.</Text>
         <Text style={styles.howStep}>4. Confirman los dos. Listo, ambos álbumes se actualizan.</Text>
       </View>
+
+      {scannerOpen ? (
+        <QRScanner onResult={handleScanResult} onClose={() => setScannerOpen(false)} />
+      ) : null}
     </ScrollView>
   );
 }
