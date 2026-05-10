@@ -50,3 +50,6 @@ export const countries: Country[] = [
   { id: 'ghana', name: 'Ghana', group: 'Group L', code: 'GHA', flag: '🇬🇭', colors: { primary: '#006B3F' } },
   { id: 'panama', name: 'Panama', group: 'Group L', code: 'PAN', flag: '🇵🇦', colors: { primary: '#DA121A' } },
 ];
+
+export const getGroupCountries = (group: string): Country[] =>
+  countries.filter((c) => c.group === group);

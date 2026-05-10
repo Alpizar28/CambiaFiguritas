@@ -19,6 +19,7 @@ import { AlbumProgress } from './components/AlbumProgress';
 import { ConnectedStickerCard } from './components/ConnectedStickerCard';
 import { StickerActionSheet } from './components/StickerActionSheet';
 import { allStickers, cocaColaStickerGroup, countryStickerGroups, specialStickerGroup } from './data/albumCatalog';
+import { getGroupCountries } from './data/countries';
 import { haptic } from '../../utils/haptics';
 import { track } from '../../services/analytics';
 import { Tooltip } from '../../components/Tooltip';
@@ -318,7 +319,14 @@ export function AlbumScreen() {
       );
     }
     if (slot.type === 'group_info') {
-      return <GroupInfoSlot key={`group-info-${index}`} group={activeGroup.country.group} />;
+      return (
+        <GroupInfoSlot
+          key={`group-info-${index}`}
+          group={activeGroup.country.group}
+          countries={getGroupCountries(activeGroup.country.group)}
+          activeCountryId={activeGroup.country.id}
+        />
+      );
     }
     const sticker = stickersById[slot.stickerId];
     if (!sticker || !shouldShowSticker(sticker)) {

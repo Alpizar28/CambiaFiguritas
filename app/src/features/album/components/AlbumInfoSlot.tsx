@@ -1,7 +1,13 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radii, spacing } from '../../../constants/theme';
+import type { Country } from '../types';
 import { getCountryAccent } from '../utils/countryAccent';
+
+const IS_WEB = Platform.OS === 'web';
+const noSelect = IS_WEB
+  ? ({ userSelect: 'none', WebkitUserSelect: 'none' } as any)
+  : null;
 
 type CountryInfoSlotProps = {
   name: string;
@@ -29,10 +35,42 @@ export function CountryInfoSlot({ name, group, code, flag }: CountryInfoSlotProp
   );
 }
 
-export function GroupInfoSlot({ group }: { group: string }) {
+type GroupInfoSlotProps = {
+  group: string;
+  countries: Country[];
+  activeCountryId?: string;
+};
+
+const localizeGroup = (group: string) => group.replace(/^Group\s/i, 'Grupo ');
+
+export function GroupInfoSlot({ group, countries, activeCountryId }: GroupInfoSlotProps) {
   return (
     <View style={[styles.slot, styles.groupSlot]}>
-      <Text style={styles.groupLabel}>{group}</Text>
+      <View style={styles.groupHeader}>
+        <Text style={[styles.groupLabel, noSelect]}>{localizeGroup(group)}</Text>
+      </View>
+      <View style={styles.groupBody}>
+        {countries.map((c) => {
+          const isActive = c.id === activeCountryId;
+          return (
+            <View
+              key={c.id}
+              style={[styles.groupRow, isActive && styles.groupRowActive]}
+            >
+              <Text style={[styles.groupRowFlag, noSelect]}>{c.flag}</Text>
+              <Text style={[styles.groupRowCode, isActive && styles.groupRowCodeActive, noSelect]}>
+                {c.code}
+              </Text>
+              <Text
+                numberOfLines={1}
+                style={[styles.groupRowName, isActive && styles.groupRowNameActive, noSelect]}
+              >
+                {c.name}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -53,12 +91,61 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   groupSlot: {
-    alignItems: 'center',
-    backgroundColor: '#D9272D',
+    backgroundColor: '#FFFDF7',
     borderColor: '#A81E22',
     borderWidth: 2,
     flexBasis: '23.5%',
-    justifyContent: 'center',
+    minHeight: 150,
+    overflow: 'hidden',
+    padding: 0,
+  },
+  groupHeader: {
+    alignItems: 'center',
+    backgroundColor: '#D9272D',
+    paddingVertical: 6,
+  },
+  groupBody: {
+    flex: 1,
+    justifyContent: 'space-around',
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  groupRow: {
+    alignItems: 'center',
+    borderRadius: radii.sm,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  groupRowActive: {
+    backgroundColor: '#FFF4D6',
+    borderColor: '#E8B400',
+    borderWidth: 1,
+  },
+  groupRowFlag: {
+    fontSize: 14,
+    lineHeight: 16,
+  },
+  groupRowCode: {
+    color: '#1A1A1A',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+    minWidth: 22,
+  },
+  groupRowCodeActive: {
+    color: '#A87600',
+  },
+  groupRowName: {
+    color: '#3A352B',
+    flex: 1,
+    fontSize: 8,
+    fontWeight: '700',
+  },
+  groupRowNameActive: {
+    color: '#A87600',
+    fontWeight: '900',
   },
   kicker: {
     color: '#8B6F47',
@@ -100,10 +187,10 @@ const styles = StyleSheet.create({
   },
   groupLabel: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 13,
     fontWeight: '900',
     textAlign: 'center',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
 });
