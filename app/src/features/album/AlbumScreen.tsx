@@ -684,8 +684,9 @@ export function AlbumScreen() {
                 if (idx !== activePageIndex) setActivePageIndex(idx);
               }}
               renderItem={({ item }) => (
-                <View style={{ width }}>{renderMobileAlbumPage(item)}</View>
+                <View style={{ width, height: '100%' }}>{renderMobileAlbumPage(item)}</View>
               )}
+              style={{ flex: 1 }}
             />
             <View style={[styles.pageDots, { paddingBottom: insets.bottom + spacing.sm }]}>
               {activeGroup.pages.map((p, i) => (
@@ -1154,10 +1155,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FAF6E8',
     borderColor: '#E8DEC2',
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    padding: spacing.sm,
-    margin: spacing.sm,
+    padding: 6,
+    marginHorizontal: 6,
+    marginTop: 4,
+    marginBottom: 4,
   },
   mobileGrid: {
     flex: 1,
