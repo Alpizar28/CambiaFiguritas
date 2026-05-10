@@ -14,7 +14,7 @@ import { colors, radii, spacing } from '../../constants/theme';
 import { track } from '../../services/analytics';
 import type { TradeStackParamList } from '../../types/navigation';
 
-const QR_PREFIX = 'cambiafiguritas://trade/';
+const QR_PREFIX = 'https://cambiafiguritas.online/trade/';
 
 export function TradeHostScreen() {
   const insets = useSafeAreaInsets();
