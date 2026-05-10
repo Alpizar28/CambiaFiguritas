@@ -92,7 +92,9 @@ function GroupBlock({
         accessibilityLabel={`${summary.group.country.name}, ${collapsed ? 'expandir' : 'contraer'}`}
       >
         <View style={{ flex: 1 }}>
-          <Text style={styles.groupTitle}>{summary.group.country.name}</Text>
+          <Text style={styles.groupTitle}>
+            {summary.group.country.flag ? `${summary.group.country.flag} ` : ''}{summary.group.country.name}
+          </Text>
           <Text style={styles.groupSubtitle}>{subtitle}</Text>
         </View>
         {summary.owned === summary.total && summary.total > 0 ? (

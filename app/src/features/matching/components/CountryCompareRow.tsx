@@ -41,7 +41,11 @@ export function CountryCompareRow({ data, defaultExpanded = false }: Props) {
     <View style={styles.container}>
       <Pressable onPress={toggle} style={({ pressed }) => [styles.header, pressed && styles.pressed]}>
         <View style={[styles.flag, { backgroundColor: flagColor }]}>
-          <Text style={styles.flagText}>{data.code.slice(0, 3)}</Text>
+          {data.countryFlag ? (
+            <Text style={styles.flagEmoji}>{data.countryFlag}</Text>
+          ) : (
+            <Text style={styles.flagText}>{data.code.slice(0, 3)}</Text>
+          )}
         </View>
         <View style={styles.titleBlock}>
           <Text style={styles.title} numberOfLines={1}>
@@ -186,6 +190,10 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontSize: 11,
     letterSpacing: 0.5,
+  },
+  flagEmoji: {
+    fontSize: 22,
+    lineHeight: 24,
   },
   titleBlock: {
     flex: 1,

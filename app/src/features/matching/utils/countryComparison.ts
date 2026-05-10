@@ -16,6 +16,7 @@ export type StickerCompare = {
 export type CountryCompare = {
   countryId: string;
   countryName: string;
+  countryFlag?: string;
   group?: string;
   code: string;
   total: number;
@@ -64,6 +65,7 @@ export function buildCountryCompare(
     groups.set(country.id, {
       countryId: country.id,
       countryName: country.name,
+      countryFlag: country.flag,
       group: country.group,
       code: country.code,
       total: 0,

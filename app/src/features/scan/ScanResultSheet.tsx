@@ -113,7 +113,7 @@ export function ScanResultSheet({
                 <Text style={styles.itemTitle} numberOfLines={1}>
                   {candidate.sticker.displayCode}
                   {candidate.sticker.countryName
-                    ? ` · ${candidate.sticker.countryName}`
+                    ? ` · ${candidate.sticker.countryFlag ? `${candidate.sticker.countryFlag} ` : ''}${candidate.sticker.countryName}`
                     : ''}
                 </Text>
                 <Text style={styles.itemMeta} numberOfLines={1}>

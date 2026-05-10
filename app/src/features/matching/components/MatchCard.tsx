@@ -24,6 +24,7 @@ const stickerIndex: Map<string, Sticker> = new Map(allStickers.map((s) => [s.id,
 
 type CountryGroup = {
   countryName: string;
+  countryFlag?: string;
   items: { id: string; code: string; priority: boolean }[];
   total: number;
 };
@@ -35,7 +36,7 @@ function groupByCountry(ids: string[], priorityIds: Set<string> = new Set()): Co
     const countryName = sticker?.countryName ?? 'Especiales';
     let group = map.get(countryName);
     if (!group) {
-      group = { countryName, items: [], total: 0 };
+      group = { countryName, countryFlag: sticker?.countryFlag, items: [], total: 0 };
       map.set(countryName, group);
     }
     group.total += 1;
@@ -394,7 +395,9 @@ function DetailSection({
         <View style={{ gap: spacing.xs }}>
           {groups.map((g) => (
             <View key={g.countryName} style={styles.countryRow}>
-              <Text style={styles.countryName}>{g.countryName}</Text>
+              <Text style={styles.countryName}>
+                {g.countryFlag ? `${g.countryFlag} ` : ''}{g.countryName}
+              </Text>
               <View style={styles.codes}>
                 {g.items.map((it) => (
                   <View
