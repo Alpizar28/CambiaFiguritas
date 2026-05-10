@@ -670,44 +670,94 @@ export function AlbumScreen() {
             </View>
           </ScrollView>
         ) : (
-          <View
-            style={styles.mobilePagerWrap}
-            onLayout={(e) => {
-              const h = e.nativeEvent.layout.height;
-              if (h && h !== pagerHeight) setPagerHeight(h);
-            }}
-          >
-            <FlatList
-              ref={mobilePagerRef}
-              data={activeGroup.pages}
-              keyExtractor={(p) => `page-${p.pageInCountry}`}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              snapToAlignment="start"
-              decelerationRate="fast"
-              onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
-                const idx = Math.round(e.nativeEvent.contentOffset.x / width);
-                if (idx !== activePageIndex) setActivePageIndex(idx);
-              }}
-              renderItem={({ item }) => (
-                <View style={{ width, height: pagerHeight || undefined }}>
-                  {renderMobileAlbumPage(item)}
-                </View>
-              )}
+          <View style={styles.mobilePagerWrap}>
+            <View
               style={{ flex: 1 }}
-            />
-            <View style={[styles.pageDots, { paddingBottom: insets.bottom + spacing.sm }]}>
-              {activeGroup.pages.map((p, i) => (
-                <View
-                  key={`dot-${p.pageInCountry}`}
-                  style={[
-                    styles.pageDot,
-                    i === activePageIndex && { backgroundColor: activeAccent, width: 24 },
-                  ]}
-                />
-              ))}
+              onLayout={(e) => {
+                const h = e.nativeEvent.layout.height;
+                if (h && h !== pagerHeight) setPagerHeight(h);
+              }}
+            >
+              <FlatList
+                ref={mobilePagerRef}
+                data={activeGroup.pages}
+                keyExtractor={(p) => `page-${p.pageInCountry}`}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                snapToAlignment="start"
+                decelerationRate="fast"
+                onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+                  const idx = Math.round(e.nativeEvent.contentOffset.x / width);
+                  if (idx !== activePageIndex) setActivePageIndex(idx);
+                }}
+                renderItem={({ item }) => (
+                  <View style={{ width, height: pagerHeight || undefined }}>
+                    {renderMobileAlbumPage(item)}
+                  </View>
+                )}
+                style={{ flex: 1 }}
+              />
             </View>
+            {activeGroup.pages.length > 1 && (
+              <View style={[styles.pagerNavRow, { paddingBottom: insets.bottom + spacing.sm }]}>
+                <Pressable
+                  accessibilityLabel="Pagina anterior"
+                  disabled={activePageIndex === 0}
+                  onPress={() => {
+                    if (activePageIndex === 0) return;
+                    haptic.tap();
+                    const next = activePageIndex - 1;
+                    mobilePagerRef.current?.scrollToOffset({ offset: next * width, animated: true });
+                    setActivePageIndex(next);
+                  }}
+                  style={[styles.pagerChevron, activePageIndex === 0 && styles.pagerChevronDisabled]}
+                >
+                  <Text style={styles.pagerChevronText}>‹</Text>
+                </Pressable>
+                <View style={styles.pagerProgressCol}>
+                  <Text style={styles.pagerProgressLabel}>
+                    Pagina {activePageIndex + 1} / {activeGroup.pages.length}
+                  </Text>
+                  <View style={styles.pagerProgressTrack}>
+                    <View
+                      style={[
+                        styles.pagerProgressFill,
+                        {
+                          backgroundColor: activeAccent,
+                          width: `${((activePageIndex + 1) / activeGroup.pages.length) * 100}%` as any,
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+                <Pressable
+                  accessibilityLabel="Pagina siguiente"
+                  disabled={activePageIndex === activeGroup.pages.length - 1}
+                  onPress={() => {
+                    if (activePageIndex === activeGroup.pages.length - 1) return;
+                    haptic.tap();
+                    const next = activePageIndex + 1;
+                    mobilePagerRef.current?.scrollToOffset({ offset: next * width, animated: true });
+                    setActivePageIndex(next);
+                  }}
+                  style={[
+                    styles.pagerChevron,
+                    activePageIndex === activeGroup.pages.length - 1 && styles.pagerChevronDisabled,
+                  ]}
+                >
+                  <Text style={styles.pagerChevronText}>›</Text>
+                </Pressable>
+              </View>
+            )}
+            {activeGroup.pages.length > 1 && (
+              <Tooltip
+                id="album-page-pager"
+                title="Hay mas postales →"
+                message="Desliza o toca las flechas para pasar a la pagina 2."
+                position="bottom"
+              />
+            )}
           </View>
         )}
 
@@ -1191,13 +1241,63 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: spacing.xs,
-    paddingTop: spacing.sm,
   },
   pageDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  pagerNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  pagerProgressCol: {
+    flex: 1,
+    alignItems: 'stretch',
+    gap: 6,
+  },
+  pagerProgressLabel: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+  },
+  pagerProgressTrack: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 4,
+    height: 6,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  pagerProgressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  pagerChevron: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.md,
+    backgroundColor: '#1A1A1A',
+    borderColor: '#333',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pagerChevronDisabled: {
+    opacity: 0.3,
+  },
+  pagerChevronText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 24,
   },
 
   // ----- COMPARTIDO -----
