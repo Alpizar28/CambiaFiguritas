@@ -542,7 +542,7 @@ export function AlbumScreen() {
           onClose={closeSheet}
         />
       <ShareCardModal visible={shareModalOpen} onClose={() => setShareModalOpen(false)} />
-      <ScanFab onPress={() => setScanOpen(true)} />
+      {/* ScanFab oculto temporalmente */}
       <ScanScreen visible={scanOpen} onClose={() => setScanOpen(false)} />
       </View>
     );
@@ -717,7 +717,7 @@ export function AlbumScreen() {
         </View>
       </ScrollView>
       <ShareCardModal visible={shareModalOpen} onClose={() => setShareModalOpen(false)} />
-      <ScanFab onPress={() => setScanOpen(true)} />
+      {/* ScanFab oculto temporalmente */}
       <ScanScreen visible={scanOpen} onClose={() => setScanOpen(false)} />
     </View>
   );
