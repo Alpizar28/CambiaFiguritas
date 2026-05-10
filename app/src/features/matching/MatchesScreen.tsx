@@ -18,7 +18,9 @@ import { useMatchStore } from '../../store/matchStore';
 import { useWishlistStore } from '../../store/wishlistStore';
 import { useTradeStore } from '../../store/tradeStore';
 import { HistoryIcon, QRScanIcon } from '../trade/components/TradeIcons';
-import { findMatches, saveUserLocation } from '../../services/matchingService';
+import { findMatches } from '../../services/matchingService';
+import { saveUserLocation, touchLastSeen } from '../../services/userService';
+import { reverseGeocode } from '../../utils/geocoding';
 import { consumeMatchSlot, unlockMatchSlot } from '../../services/matchSlotsService';
 import { saveMatchBatch } from '../../services/matchHistoryService';
 import { citySlug } from '../../utils/citySlug';
@@ -42,6 +44,7 @@ import {
   pickTopN,
   type ZoneFilter,
 } from './utils/matchFilter';
+import { sortMatches, isValidSort, type MatchSort } from './utils/matchSort';
 import type { Match } from '../../services/matchingService';
 import { colors, spacing, radii } from '../../constants/theme';
 import { ENABLE_PREMIUM_UI } from '../../constants/featureFlags';
@@ -52,6 +55,7 @@ const stickerIndex = new Map<string, Sticker>(allStickers.map((s) => [s.id, s]))
 
 const CACHE_MS = 60_000;
 const FILTER_STORAGE_KEY = '@cf:matches:zoneFilter';
+const SORT_STORAGE_KEY = '@cf:matches:sort';
 const FREE_TOP_N = 5;
 const PREMIUM_TOP_N = 10;
 
@@ -60,6 +64,10 @@ type LockState = {
   cap: number;
   resetAt: number;
 } | null;
+
+type ListRow =
+  | { type: 'header'; label: string; count: number }
+  | { type: 'match'; match: Match };
 
 export function MatchesScreen() {
   const insets = useSafeAreaInsets();
@@ -74,6 +82,8 @@ export function MatchesScreen() {
   const filterInitializedRef = useRef(false);
 
   const [filter, setFilter] = useState<ZoneFilter>('todos');
+  const [sort, setSort] = useState<MatchSort>('recommended');
+  const sortInitializedRef = useRef(false);
   const [hasGps, setHasGps] = useState(false);
   const [lockState, setLockState] = useState<LockState>(null);
   const [adModal, setAdModal] = useState<{ visible: boolean; durationMs: number }>({ visible: false, durationMs: 15000 });
@@ -179,6 +189,22 @@ export function MatchesScreen() {
     } catch { /* clipboard not available */ }
   };
 
+  // Touch lastSeen al abrir la pantalla (throttle 5min en el service).
+  useEffect(() => {
+    if (uid) touchLastSeen(uid).catch(() => {});
+  }, [uid]);
+
+  // Restore sort persistido al primer mount
+  useEffect(() => {
+    if (sortInitializedRef.current) return;
+    sortInitializedRef.current = true;
+    AsyncStorage.getItem(SORT_STORAGE_KEY)
+      .then((stored) => {
+        if (stored && isValidSort(stored)) setSort(stored);
+      })
+      .catch(() => {});
+  }, []);
+
   // Restore filter persistido al primer mount
   useEffect(() => {
     if (filterInitializedRef.current) return;
@@ -205,13 +231,35 @@ export function MatchesScreen() {
 
   const filteredMatches = useMemo(() => {
     const filtered = applyZoneFilter(matches, filter, userCitySlug);
-    return pickTopN(filtered, isPremium ? PREMIUM_TOP_N : FREE_TOP_N);
-  }, [matches, filter, userCitySlug, isPremium]);
+    const capped = pickTopN(filtered, isPremium ? PREMIUM_TOP_N : FREE_TOP_N);
+    return sortMatches(capped, sort);
+  }, [matches, filter, userCitySlug, isPremium, sort]);
+
+  // Cuando hay matches perfectos y el sort no es perfect_first, separar en buckets
+  // para renderizar la sección "Perfectos" sobre "Otros matches".
+  const { perfectMatches, otherMatches } = useMemo(() => {
+    if (sort === 'perfect_first') {
+      return { perfectMatches: [] as Match[], otherMatches: filteredMatches };
+    }
+    const perfect: Match[] = [];
+    const rest: Match[] = [];
+    for (const m of filteredMatches) {
+      if (m.isPerfectTrade) perfect.push(m);
+      else rest.push(m);
+    }
+    return { perfectMatches: perfect, otherMatches: rest };
+  }, [filteredMatches, sort]);
 
   const handleFilterChange = (newFilter: ZoneFilter) => {
     setFilter(newFilter);
     AsyncStorage.setItem(FILTER_STORAGE_KEY, newFilter).catch(() => {});
     track({ name: 'matches_filter_changed', params: { filter: newFilter } });
+  };
+
+  const handleSortChange = (newSort: MatchSort) => {
+    setSort(newSort);
+    AsyncStorage.setItem(SORT_STORAGE_KEY, newSort).catch(() => {});
+    track({ name: 'matches_sort_changed', params: { sort: newSort } });
   };
 
   const getLocation = useCallback(async (): Promise<{ lat: number; lng: number } | null> => {
@@ -235,7 +283,14 @@ export function MatchesScreen() {
       const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       coordsRef.current = coords;
       setHasGps(true);
-      if (uid) saveUserLocation(uid, coords.lat, coords.lng).catch(() => {});
+      if (uid) {
+        // Resolver país en background (cacheado por bucket de 5km) y persistir junto a coords.
+        reverseGeocode(coords.lat, coords.lng)
+          .then((label) => saveUserLocation(uid, coords.lat, coords.lng, label.country ?? undefined))
+          .catch(() => {
+            saveUserLocation(uid, coords.lat, coords.lng).catch(() => {});
+          });
+      }
       return coords;
     } catch {
       setHasGps(false);
@@ -387,6 +442,19 @@ export function MatchesScreen() {
     );
   };
 
+  const renderSortChip = (value: MatchSort, label: string) => {
+    const active = sort === value;
+    return (
+      <Pressable
+        key={value}
+        onPress={() => handleSortChange(value)}
+        style={[styles.sortChip, active && styles.sortChipActive]}
+      >
+        <Text style={[styles.sortChipText, active && styles.sortChipTextActive]}>{label}</Text>
+      </Pressable>
+    );
+  };
+
   const renderFilterChip = (
     value: ZoneFilter,
     label: string,
@@ -485,11 +553,37 @@ export function MatchesScreen() {
         </View>
       ) : (
         <FlatList
-          data={filteredMatches}
-          keyExtractor={(m) => m.user.uid}
-          renderItem={({ item }) => (
-            <MatchRow match={item} onPress={() => openVsPreview(item)} />
-          )}
+          data={
+            perfectMatches.length > 0 && sort !== 'perfect_first'
+              ? ([
+                  { type: 'header', label: 'Perfectos', count: perfectMatches.length },
+                  ...perfectMatches.map((m) => ({ type: 'match' as const, match: m })),
+                  ...(otherMatches.length > 0
+                    ? [{ type: 'header' as const, label: 'Otros matches', count: otherMatches.length }]
+                    : []),
+                  ...otherMatches.map((m) => ({ type: 'match' as const, match: m })),
+                ] as ListRow[])
+              : (filteredMatches.map((m) => ({ type: 'match' as const, match: m })) as ListRow[])
+          }
+          keyExtractor={(item, index) =>
+            item.type === 'match' ? item.match.user.uid : `header-${item.label}-${index}`
+          }
+          renderItem={({ item }) =>
+            item.type === 'header' ? (
+              <View style={styles.sectionHeader}>
+                <Text
+                  style={[
+                    styles.sectionHeaderText,
+                    item.label === 'Perfectos' && styles.sectionHeaderPerfect,
+                  ]}
+                >
+                  {item.label === 'Perfectos' ? '⭐ Perfectos' : item.label} · {item.count}
+                </Text>
+              </View>
+            ) : (
+              <MatchRow match={item.match} onPress={() => openVsPreview(item.match)} />
+            )
+          }
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
           ListHeaderComponent={
@@ -528,6 +622,13 @@ export function MatchesScreen() {
                       💡 Cargá tu ciudad en Perfil para usar este filtro.
                     </Text>
                   ) : null}
+                  <View style={styles.sortRow}>
+                    <Text style={styles.sortLabel}>Ordenar:</Text>
+                    {renderSortChip('recommended', 'Recomendado')}
+                    {renderSortChip('closest', 'Cercanía')}
+                    {renderSortChip('score', 'Score')}
+                    {renderSortChip('perfect_first', 'Perfectos')}
+                  </View>
                 </>
               ) : null}
             </View>
@@ -773,6 +874,53 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginBottom: spacing.sm,
     fontStyle: 'italic',
+  },
+  sortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  sortLabel: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    marginRight: spacing.xs,
+  },
+  sortChip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  sortChipActive: {
+    backgroundColor: colors.text,
+    borderColor: colors.text,
+  },
+  sortChipText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  sortChipTextActive: {
+    color: colors.background,
+  },
+  sectionHeader: {
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  sectionHeaderText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  sectionHeaderPerfect: {
+    color: '#B8860B',
   },
   center: {
     flex: 1,

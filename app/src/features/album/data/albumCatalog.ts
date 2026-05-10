@@ -91,6 +91,7 @@ const countryStickers = countries.flatMap<Sticker>((country) =>
       slotNumber,
       countryId: country.id,
       countryName: country.name,
+      countryFlag: country.flag,
       group: country.group,
       kind: getStickerKind(slotNumber),
       playerNumber: slotNumber,

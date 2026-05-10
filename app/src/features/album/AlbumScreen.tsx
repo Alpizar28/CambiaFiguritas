@@ -99,6 +99,16 @@ const getGroupStats = (stickers: Sticker[], statuses: Record<string, StickerStat
   return { total: stickers.length, owned, repeated };
 };
 
+// "Tengo" engloba owned + repeated + special: no se puede tener repetida sin
+// poseer la base, así que el filtro debe coincidir con el contador de getGroupStats.
+const matchesAlbumFilter = (status: StickerStatus, filter: AlbumFilter): boolean => {
+  if (filter === 'all') return true;
+  if (filter === 'owned') {
+    return status === 'owned' || status === 'repeated' || status === 'special';
+  }
+  return status === filter;
+};
+
 const COUNTRY_BTN_WIDTH = 70;
 
 export function AlbumScreen() {
@@ -171,8 +181,7 @@ export function AlbumScreen() {
     () =>
       activeGroup.stickers.filter((sticker) => {
         const status = statuses[sticker.id] ?? 'missing';
-        const matchesFilter = activeFilter === 'all' || status === activeFilter;
-        return matchesFilter && matchesQuery(sticker, effectiveQuery);
+        return matchesAlbumFilter(status, activeFilter) && matchesQuery(sticker, effectiveQuery);
       }),
     [activeGroup, statuses, activeFilter, effectiveQuery],
   );
@@ -283,8 +292,7 @@ export function AlbumScreen() {
 
   const shouldShowSticker = (sticker: Sticker) => {
     const status = statuses[sticker.id] ?? 'missing';
-    const matchesFilter = activeFilter === 'all' || status === activeFilter;
-    return matchesFilter && matchesQuery(sticker, effectiveQuery);
+    return matchesAlbumFilter(status, activeFilter) && matchesQuery(sticker, effectiveQuery);
   };
 
   const renderSlot = (slot: AlbumSlot, index: number) => {
@@ -295,6 +303,7 @@ export function AlbumScreen() {
           code={activeGroup.country.code}
           group={activeGroup.country.group}
           name={activeGroup.country.name}
+          flag={activeGroup.country.flag}
         />
       );
     }
@@ -353,7 +362,7 @@ export function AlbumScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.mobileKicker}>Album Mundial 2026</Text>
               <Text style={styles.mobileTitle} numberOfLines={1}>
-                {activeGroup.country.name}
+                {activeGroup.country.flag ? `${activeGroup.country.flag} ` : ''}{activeGroup.country.name}
               </Text>
             </View>
             <Pressable
@@ -423,7 +432,7 @@ export function AlbumScreen() {
                     >
                       <Text style={styles.suggestionCode}>{group.country.code}</Text>
                       <Text style={styles.suggestionName} numberOfLines={1}>
-                        {group.country.name}
+                        {group.country.flag ? `${group.country.flag} ` : ''}{group.country.name}
                       </Text>
                       {stickerMatches > 0 && (
                         <Text style={styles.suggestionMatches}>{stickerMatches} fig</Text>
@@ -565,7 +574,7 @@ export function AlbumScreen() {
           <View style={styles.toolbar}>
             <View style={styles.titleBlock}>
               <Text style={styles.kicker}>Album Mundial 2026</Text>
-              <Text style={styles.title}>{activeGroup.country.name}</Text>
+              <Text style={styles.title}>{activeGroup.country.flag ? `${activeGroup.country.flag} ` : ''}{activeGroup.country.name}</Text>
               <Text style={styles.subtitle}>
                 {activeGroup.country.group} · {activeStats.owned}/{activeStats.total} ·{' '}
                 {activeStats.repeated} repetidas
@@ -607,7 +616,7 @@ export function AlbumScreen() {
                     >
                       <Text style={styles.suggestionCode}>{group.country.code}</Text>
                       <Text style={styles.suggestionName} numberOfLines={1}>
-                        {group.country.name}
+                        {group.country.flag ? `${group.country.flag} ` : ''}{group.country.name}
                       </Text>
                       {stickerMatches > 0 && (
                         <Text style={styles.suggestionMatches}>{stickerMatches} fig</Text>

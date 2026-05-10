@@ -6,9 +6,10 @@ type CountryInfoSlotProps = {
   name: string;
   group: string;
   code: string;
+  flag?: string;
 };
 
-export function CountryInfoSlot({ name, group, code }: CountryInfoSlotProps) {
+export function CountryInfoSlot({ name, group, code, flag }: CountryInfoSlotProps) {
   const accentColor = countryColors[code] || colors.primary;
 
   return (
@@ -16,7 +17,11 @@ export function CountryInfoSlot({ name, group, code }: CountryInfoSlotProps) {
       <Text style={styles.kicker}>We are</Text>
       <Text numberOfLines={1} style={[styles.countryName, { color: accentColor }]}>{name}</Text>
       <View style={styles.flagRow}>
-        <View style={[styles.flagMark, { borderColor: accentColor }]} />
+        {flag ? (
+          <Text style={styles.flagEmoji}>{flag}</Text>
+        ) : (
+          <View style={[styles.flagMark, { borderColor: accentColor }]} />
+        )}
         <Text style={styles.meta}>{code} / {group}</Text>
       </View>
     </View>
@@ -81,6 +86,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     height: 16,
     width: 24,
+  },
+  flagEmoji: {
+    fontSize: 22,
+    lineHeight: 24,
   },
   meta: {
     color: '#5A4A3A',

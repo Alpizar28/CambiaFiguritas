@@ -10,6 +10,31 @@ type Props = {
   compact?: boolean;
 };
 
+const LAST_SEEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function formatLastSeen(ts?: number): string | null {
+  if (!ts) return null;
+  const diff = Date.now() - ts;
+  if (diff < 0 || diff > LAST_SEEN_MAX_AGE_MS) return null;
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 10) return 'Activo ahora';
+  if (minutes < 60) return `Activo hace ${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Activo hace ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `Hace ${days}d`;
+}
+
+function buildLocationLine(city: string | undefined, country: string | undefined, distanceKm: number | null): string {
+  const cityClean = city?.trim() || '';
+  const countryClean = country?.trim() || '';
+  if (cityClean) {
+    return distanceKm != null ? `${cityClean} · a ${formatDistance(distanceKm)}` : cityClean;
+  }
+  if (countryClean) return countryClean;
+  return 'Sin ubicación';
+}
+
 export function MatchRow({ match, onPress, compact }: Props) {
   const { user, score, distanceKm, isPerfectTrade, iNeedFromThem, theyNeedFromMe } = match;
 
@@ -17,11 +42,9 @@ export function MatchRow({ match, onPress, compact }: Props) {
   const repCount = user.reputationCount ?? 0;
   const isVerified = repCount >= 20 && repUp / repCount >= 0.85;
 
-  const subtitleParts = [
-    user.city || null,
-    distanceKm != null ? `a ${formatDistance(distanceKm)}` : null,
-  ].filter(Boolean);
-  const subtitle = subtitleParts.join(' · ');
+  const subtitle = buildLocationLine(user.city, user.country, distanceKm);
+  const lastSeenLabel = formatLastSeen(user.lastSeenAt);
+  const isOnline = lastSeenLabel === 'Activo ahora';
 
   return (
     <TouchableOpacity
@@ -33,13 +56,16 @@ export function MatchRow({ match, onPress, compact }: Props) {
       onPress={onPress}
       activeOpacity={0.7}
     >
-      {user.photoUrl ? (
-        <Image source={{ uri: user.photoUrl }} style={styles.avatar} />
-      ) : (
-        <View style={[styles.avatar, styles.avatarFallback]}>
-          <Text style={styles.avatarLetter}>{user.name?.[0] ?? '?'}</Text>
-        </View>
-      )}
+      <View style={styles.avatarWrap}>
+        {user.photoUrl ? (
+          <Image source={{ uri: user.photoUrl }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, styles.avatarFallback]}>
+            <Text style={styles.avatarLetter}>{user.name?.[0] ?? '?'}</Text>
+          </View>
+        )}
+        {isOnline ? <View style={styles.onlineDot} /> : null}
+      </View>
 
       <View style={styles.info}>
         <View style={styles.nameRow}>
@@ -50,11 +76,16 @@ export function MatchRow({ match, onPress, compact }: Props) {
           {isVerified ? <Text style={styles.verifiedDot}>✓</Text> : null}
         </View>
         <Text style={styles.subtitle} numberOfLines={1}>
-          {subtitle || 'Sin ubicación'}
+          {subtitle}
         </Text>
         <Text style={styles.breakdownLine} numberOfLines={1}>
           🔁 {iNeedFromThem} pedís · {theyNeedFromMe} ofrecés
         </Text>
+        {lastSeenLabel ? (
+          <Text style={styles.lastSeen} numberOfLines={1}>
+            {lastSeenLabel}
+          </Text>
+        ) : null}
       </View>
 
       <View style={styles.scoreChip}>
@@ -85,6 +116,11 @@ const styles = StyleSheet.create({
     borderColor: '#FFD700',
     borderWidth: 2,
   },
+  avatarWrap: {
+    position: 'relative',
+    width: 44,
+    height: 44,
+  },
   avatar: {
     width: 44,
     height: 44,
@@ -94,6 +130,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  onlineDot: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#16A34A',
+    borderWidth: 2,
+    borderColor: colors.surface,
   },
   avatarLetter: {
     color: colors.text,
@@ -131,6 +178,11 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 11,
     fontWeight: '600',
+  },
+  lastSeen: {
+    color: colors.textMuted,
+    fontSize: 10,
+    marginTop: 1,
   },
   scoreChip: {
     backgroundColor: colors.card,

@@ -10,6 +10,10 @@ export type AppUser = {
   // lat/lng se guardan bucketeados a múltiplos de 0.05° (~5km) por privacidad.
   lat?: number;
   lng?: number;
+  // País legible derivado de reverseGeocode al persistir ubicación.
+  country?: string;
+  // Epoch ms de la última vez que el dueño abrió la app (escrito con throttle).
+  lastSeenAt?: number;
   premium: boolean;
   createdAt: string;
   reputationUp?: number;

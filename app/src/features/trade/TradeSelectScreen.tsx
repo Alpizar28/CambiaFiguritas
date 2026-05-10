@@ -31,6 +31,7 @@ function rowFor(stickerId: string) {
     displayCode: sticker?.displayCode ?? stickerId,
     label: sticker?.label || sticker?.countryName || 'Jugador',
     countryName: sticker?.countryName,
+    countryFlag: sticker?.countryFlag,
   };
 }
 
@@ -258,6 +259,7 @@ export function TradeSelectScreen() {
                 displayCode={r.displayCode}
                 label={r.label}
                 countryName={r.countryName}
+                countryFlag={r.countryFlag}
                 selected={draftMine.includes(id)}
                 onToggle={handleToggleMine}
               />
@@ -283,6 +285,7 @@ export function TradeSelectScreen() {
                   displayCode={r.displayCode}
                   label={r.label}
                   countryName={r.countryName}
+                  countryFlag={r.countryFlag}
                   selected
                   disabled
                   onToggle={() => {}}

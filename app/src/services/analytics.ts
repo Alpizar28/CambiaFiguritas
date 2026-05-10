@@ -66,6 +66,7 @@ type AnalyticsEvent =
   | { name: 'share_image_generated'; params: { result: string } }
   | { name: 'share_card_generated'; params: { method: string; showName: boolean; showProgress: boolean; showRepeated: boolean; showMissing: boolean } }
   | { name: 'matches_filter_changed'; params: { filter: string } }
+  | { name: 'matches_sort_changed'; params: { sort: string } }
   | { name: 'web_vital_reported'; params: { metric: string; value: number; rating: string } }
   | { name: 'sticker_searched_by_code'; params: { code: string; matched: boolean } }
   | { name: 'demo_entered' }

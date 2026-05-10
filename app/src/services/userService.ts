@@ -85,11 +85,36 @@ function bucketCoord(n: number): number {
   return Math.round(n / COORD_BUCKET) * COORD_BUCKET;
 }
 
-export async function saveUserLocation(uid: string, lat: number, lng: number): Promise<void> {
-  await updateDoc(doc(db, 'users', uid), {
+export async function saveUserLocation(
+  uid: string,
+  lat: number,
+  lng: number,
+  country?: string,
+): Promise<void> {
+  const payload: Record<string, unknown> = {
     lat: bucketCoord(lat),
     lng: bucketCoord(lng),
-  });
+  };
+  if (country && country.trim().length > 0) {
+    payload.country = country.trim().slice(0, 60);
+  }
+  await updateDoc(doc(db, 'users', uid), payload);
+}
+
+// Throttle module-level: evitar ráfagas de writes a Firestore.
+const LAST_SEEN_THROTTLE_MS = 5 * 60 * 1000;
+let lastSeenWriteAt = 0;
+
+export async function touchLastSeen(uid: string): Promise<void> {
+  const now = Date.now();
+  if (now - lastSeenWriteAt < LAST_SEEN_THROTTLE_MS) return;
+  lastSeenWriteAt = now;
+  try {
+    await updateDoc(doc(db, 'users', uid), { lastSeenAt: now });
+  } catch {
+    // No bloquear UX si falla; reintenta en el próximo touch.
+    lastSeenWriteAt = 0;
+  }
 }
 
 export async function setUserCity(uid: string, raw: string): Promise<void> {
