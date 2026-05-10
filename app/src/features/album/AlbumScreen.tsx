@@ -295,6 +295,7 @@ export function AlbumScreen() {
           code={activeGroup.country.code}
           group={activeGroup.country.group}
           name={activeGroup.country.name}
+          flag={activeGroup.country.flag}
         />
       );
     }
@@ -353,7 +354,7 @@ export function AlbumScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.mobileKicker}>Album Mundial 2026</Text>
               <Text style={styles.mobileTitle} numberOfLines={1}>
-                {activeGroup.country.name}
+                {activeGroup.country.flag ? `${activeGroup.country.flag} ` : ''}{activeGroup.country.name}
               </Text>
             </View>
             <Pressable
@@ -423,7 +424,7 @@ export function AlbumScreen() {
                     >
                       <Text style={styles.suggestionCode}>{group.country.code}</Text>
                       <Text style={styles.suggestionName} numberOfLines={1}>
-                        {group.country.name}
+                        {group.country.flag ? `${group.country.flag} ` : ''}{group.country.name}
                       </Text>
                       {stickerMatches > 0 && (
                         <Text style={styles.suggestionMatches}>{stickerMatches} fig</Text>
@@ -565,7 +566,7 @@ export function AlbumScreen() {
           <View style={styles.toolbar}>
             <View style={styles.titleBlock}>
               <Text style={styles.kicker}>Album Mundial 2026</Text>
-              <Text style={styles.title}>{activeGroup.country.name}</Text>
+              <Text style={styles.title}>{activeGroup.country.flag ? `${activeGroup.country.flag} ` : ''}{activeGroup.country.name}</Text>
               <Text style={styles.subtitle}>
                 {activeGroup.country.group} · {activeStats.owned}/{activeStats.total} ·{' '}
                 {activeStats.repeated} repetidas
@@ -607,7 +608,7 @@ export function AlbumScreen() {
                     >
                       <Text style={styles.suggestionCode}>{group.country.code}</Text>
                       <Text style={styles.suggestionName} numberOfLines={1}>
-                        {group.country.name}
+                        {group.country.flag ? `${group.country.flag} ` : ''}{group.country.name}
                       </Text>
                       {stickerMatches > 0 && (
                         <Text style={styles.suggestionMatches}>{stickerMatches} fig</Text>

@@ -7,6 +7,7 @@ type StickerCheckRowProps = {
   displayCode: string;
   label: string;
   countryName?: string;
+  countryFlag?: string;
   selected: boolean;
   disabled?: boolean;
   onToggle: (stickerId: string) => void;
@@ -17,6 +18,7 @@ export function StickerCheckRow({
   displayCode,
   label,
   countryName,
+  countryFlag,
   selected,
   disabled,
   onToggle,
@@ -47,7 +49,7 @@ export function StickerCheckRow({
         </Text>
         {countryName ? (
           <Text style={styles.country} numberOfLines={1}>
-            {countryName}
+            {countryFlag ? `${countryFlag} ` : ''}{countryName}
           </Text>
         ) : null}
       </View>

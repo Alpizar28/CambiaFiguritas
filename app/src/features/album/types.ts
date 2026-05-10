@@ -9,6 +9,7 @@ export type Country = {
   name: string;
   group: string;
   code: string;
+  flag?: string;
 };
 
 export type Sticker = {
@@ -17,6 +18,7 @@ export type Sticker = {
   slotNumber?: number;
   countryId?: string;
   countryName?: string;
+  countryFlag?: string;
   group?: string;
   kind: StickerKind;
   playerNumber?: number;
