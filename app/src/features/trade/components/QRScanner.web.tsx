@@ -9,7 +9,15 @@ type QRScannerProps = {
   onClose: () => void;
 };
 
-type Status = 'init' | 'starting' | 'streaming' | 'denied' | 'unsupported' | 'error';
+type Status = 'idle' | 'starting' | 'streaming' | 'denied' | 'unsupported' | 'error';
+
+const isInsecureContext = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  if (window.isSecureContext) return false;
+  // localhost cuenta como secure context en browsers modernos.
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return false;
+  return true;
+};
 
 export function QRScanner({ onResult, onClose }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -17,55 +25,84 @@ export function QRScanner({ onResult, onClose }: QRScannerProps) {
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
   const lockedRef = useRef(false);
-  const [status, setStatus] = useState<Status>('init');
+  const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [permPersistDenied, setPermPersistDenied] = useState(false);
 
+  // Check inicial: si el browser soporta camera + estado de permiso previo.
   useEffect(() => {
     let cancelled = false;
-    const start = async () => {
+    const check = async () => {
       if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
         setStatus('unsupported');
         return;
       }
-      setStatus('starting');
+      if (isInsecureContext()) {
+        setStatus('error');
+        setErrorMsg('Necesitas abrir el sitio por HTTPS para usar la camara.');
+        return;
+      }
+      // Permissions API: si esta denied persistente, mostrar instrucciones.
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
-          audio: false,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
+        const perms = (navigator as Navigator & { permissions?: { query: (q: { name: string }) => Promise<{ state: string; onchange: ((this: PermissionStatus, ev: Event) => unknown) | null }> } }).permissions;
+        if (perms?.query) {
+          const result = await perms.query({ name: 'camera' });
+          if (cancelled) return;
+          if (result.state === 'denied') {
+            setPermPersistDenied(true);
+            setStatus('denied');
+            return;
+          }
         }
-        streamRef.current = stream;
-        const video = videoRef.current;
-        if (video) {
-          video.srcObject = stream;
-          video.setAttribute('playsinline', 'true');
-          await video.play().catch(() => {});
-        }
-        setStatus('streaming');
-        scheduleScan();
-      } catch (err) {
-        const e = err as DOMException;
-        if (e?.name === 'NotAllowedError' || e?.name === 'SecurityError') {
-          setStatus('denied');
-        } else if (e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError') {
-          setStatus('error');
-          setErrorMsg('No se encontró cámara disponible.');
-        } else {
-          setStatus('error');
-          setErrorMsg(e?.message || 'No pudimos abrir la cámara.');
-        }
+      } catch {
+        // navigator.permissions o name 'camera' no soportados (iOS Safari viejo).
+        // Continuamos al boton manual.
       }
     };
-    start();
+    check();
     return () => {
       cancelled = true;
       stopStream();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const requestAccess = async () => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setStatus('unsupported');
+      return;
+    }
+    setStatus('starting');
+    setErrorMsg(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      const video = videoRef.current;
+      if (video) {
+        video.srcObject = stream;
+        video.setAttribute('playsinline', 'true');
+        await video.play().catch(() => {});
+      }
+      setStatus('streaming');
+      setPermPersistDenied(false);
+      scheduleScan();
+    } catch (err) {
+      const e = err as DOMException;
+      if (e?.name === 'NotAllowedError' || e?.name === 'SecurityError') {
+        setPermPersistDenied(true);
+        setStatus('denied');
+      } else if (e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError') {
+        setStatus('error');
+        setErrorMsg('No se encontro camara disponible.');
+      } else {
+        setStatus('error');
+        setErrorMsg(e?.message || 'No pudimos abrir la camara.');
+      }
+    }
+  };
 
   const stopStream = () => {
     if (rafRef.current != null) {
@@ -128,25 +165,19 @@ export function QRScanner({ onResult, onClose }: QRScannerProps) {
     onClose();
   };
 
-  const handleRetry = () => {
-    setStatus('init');
-    setErrorMsg(null);
-    // re-trigger effect via remount: simplemente recargar pidiendo permiso de nuevo.
-    setTimeout(() => {
-      if (typeof navigator !== 'undefined') {
-        navigator.mediaDevices?.getUserMedia({ video: { facingMode: { ideal: 'environment' } } })
-          .then((stream) => {
-            streamRef.current = stream;
-            if (videoRef.current) {
-              videoRef.current.srcObject = stream;
-              videoRef.current.play().catch(() => {});
-            }
-            setStatus('streaming');
-            scheduleScan();
-          })
-          .catch(() => setStatus('denied'));
-      }
-    }, 50);
+  const getBrowserHelp = (): string => {
+    if (typeof navigator === 'undefined') return '';
+    const ua = navigator.userAgent.toLowerCase();
+    if (/iphone|ipad|ipod/.test(ua)) {
+      return 'iOS: Ajustes > Safari > Camara > Permitir. O en Safari toca "aA" en la barra > Ajustes del sitio web > Camara > Permitir.';
+    }
+    if (/android/.test(ua) && /chrome|crios/.test(ua)) {
+      return 'Chrome Android: toca el candado en la barra > Permisos > Camara > Permitir. O Ajustes > Sitios > Camara.';
+    }
+    if (/firefox/.test(ua)) {
+      return 'Firefox: toca el candado en la barra > Permisos > Camara > Permitir.';
+    }
+    return 'En el icono de candado de la barra de direcciones, habilita el permiso de Camara y recarga la pagina.';
   };
 
   return (
@@ -167,16 +198,33 @@ export function QRScanner({ onResult, onClose }: QRScannerProps) {
           {status === 'unsupported' ? (
             <View style={styles.center}>
               <Text style={styles.body}>
-                Tu navegador no soporta acceso a cámara. Probá Chrome o Safari recientes, o tipeá el código manualmente.
+                Tu navegador no soporta acceso a camara. Probá Chrome o Safari recientes, o tipeá el código manualmente.
               </Text>
+            </View>
+          ) : status === 'idle' ? (
+            <View style={styles.center}>
+              <Text style={styles.body}>
+                Para escanear el QR necesitamos acceso a tu camara. Tu navegador te va a pedir permiso.
+              </Text>
+              <Pressable
+                onPress={requestAccess}
+                style={({ pressed }) => [styles.btn, pressed && styles.pressed]}
+              >
+                <Text style={styles.btnText}>Permitir camara</Text>
+              </Pressable>
             </View>
           ) : status === 'denied' ? (
             <View style={styles.center}>
               <Text style={styles.body}>
-                Permiso de cámara denegado. Habilitalo en la configuración del navegador y reintentá.
+                {permPersistDenied
+                  ? 'Tu navegador tiene la camara bloqueada para este sitio. Tenes que habilitarla manualmente:'
+                  : 'Permiso de camara denegado.'}
               </Text>
+              {permPersistDenied ? (
+                <Text style={styles.bodyHint}>{getBrowserHelp()}</Text>
+              ) : null}
               <Pressable
-                onPress={handleRetry}
+                onPress={requestAccess}
                 style={({ pressed }) => [styles.btn, pressed && styles.pressed]}
               >
                 <Text style={styles.btnText}>Reintentar</Text>
@@ -184,9 +232,9 @@ export function QRScanner({ onResult, onClose }: QRScannerProps) {
             </View>
           ) : status === 'error' ? (
             <View style={styles.center}>
-              <Text style={styles.body}>{errorMsg ?? 'Error al abrir la cámara.'}</Text>
+              <Text style={styles.body}>{errorMsg ?? 'Error al abrir la camara.'}</Text>
               <Pressable
-                onPress={handleRetry}
+                onPress={requestAccess}
                 style={({ pressed }) => [styles.btn, pressed && styles.pressed]}
               >
                 <Text style={styles.btnText}>Reintentar</Text>
@@ -318,6 +366,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     textAlign: 'center',
+  },
+  bodyHint: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   btn: {
     backgroundColor: colors.primary,
