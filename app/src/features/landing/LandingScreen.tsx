@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import {
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -213,6 +214,33 @@ const STATS = [
   { value: 'Free', label: '100% gratis', color: W.sky,   bg: W.skyBg  },
 ] as const;
 
+const SHOWCASE = [
+  {
+    src: require('../../../assets/landing/album.png'),
+    title: 'Tu álbum, ordenado',
+    body: 'Marcá tenidas, faltantes y repetidas.',
+    color: W.gold,
+    bg: W.goldBg,
+    border: W.goldBorder,
+  },
+  {
+    src: require('../../../assets/landing/matches.png'),
+    title: 'Encontrá quién las tiene',
+    body: 'Matches inteligentes cerca tuyo.',
+    color: W.grass,
+    bg: W.grassBg,
+    border: W.grassBorder,
+  },
+  {
+    src: require('../../../assets/landing/ranking.png'),
+    title: 'Competí con tu país',
+    body: 'Ranking global de coleccionistas.',
+    color: W.sky,
+    bg: W.skyBg,
+    border: W.skyBorder,
+  },
+] as const;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function LandingScreen({ onContinueToLogin }: Props) {
@@ -269,7 +297,7 @@ export function LandingScreen({ onContinueToLogin }: Props) {
         <View style={[styles.ctaRow, !isWide && styles.ctaColumn]}>
           <Pressable style={styles.primaryButton} onPress={handleStart}>
             <Text style={styles.primaryButtonText}>Empezar gratis</Text>
-            <IconArrowDark size={15} />
+            <IconArrowDark size={20} />
           </Pressable>
           <Pressable style={styles.secondaryButton} onPress={handleDemo}>
             <Text style={styles.secondaryButtonText}>Ver demo</Text>
@@ -295,6 +323,42 @@ export function LandingScreen({ onContinueToLogin }: Props) {
             <Text style={styles.statLabel}>{stat.label}</Text>
           </View>
         ))}
+      </View>
+
+      {/* ── SHOWCASE ── */}
+      <View style={styles.section}>
+        <View style={styles.sectionLabelRow}>
+          <View style={[styles.sectionLabelDot, { backgroundColor: W.gold }]} />
+          <Text style={[styles.sectionEyebrow, { color: W.gold }]}>La app</Text>
+        </View>
+        <Text style={styles.sectionTitle}>
+          <Text style={{ color: W.white }}>Pensada para </Text>
+          <Text style={{ color: W.gold }}>coleccionistas.</Text>
+        </Text>
+        <View style={[styles.showcaseRow, !isWide && styles.showcaseColumn]}>
+          {SHOWCASE.map((item) => (
+            <View
+              key={item.title}
+              style={[
+                styles.showcaseCard,
+                isWide && styles.showcaseCardWide,
+                { borderColor: item.border, backgroundColor: item.bg },
+              ]}
+            >
+              <View style={[styles.phoneFrame, { borderColor: item.border }]}>
+                <Image
+                  source={item.src}
+                  style={styles.phoneImage}
+                  resizeMode="cover"
+                />
+              </View>
+              <Text style={[styles.showcaseTitle, { color: item.color }]}>
+                {item.title}
+              </Text>
+              <Text style={styles.showcaseBody}>{item.body}</Text>
+            </View>
+          ))}
+        </View>
       </View>
 
       {/* ── STEPS ── */}
@@ -361,7 +425,7 @@ export function LandingScreen({ onContinueToLogin }: Props) {
         </Text>
         <Pressable style={styles.primaryButton} onPress={handleStart}>
           <Text style={styles.primaryButtonText}>Crear mi álbum</Text>
-          <IconArrowDark size={15} />
+          <IconArrowDark size={20} />
         </Pressable>
       </View>
 
@@ -426,21 +490,21 @@ const styles = StyleSheet.create({
   ctaColumn: { flexDirection: 'column', alignSelf: 'stretch' },
   primaryButton: {
     backgroundColor: W.gold,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md + 2,
-    borderRadius: radii.md,
+    paddingHorizontal: spacing.xl + 8,
+    paddingVertical: spacing.lg + 2,
+    borderRadius: radii.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs + 2,
-    minWidth: 180,
+    gap: spacing.sm,
+    minWidth: 240,
     shadowColor: W.gold,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.55,
+    shadowRadius: 26,
+    elevation: 14,
   },
-  primaryButtonText: { color: W.black, fontSize: 16, fontWeight: '900', letterSpacing: 0.2 },
+  primaryButtonText: { color: W.black, fontSize: 20, fontWeight: '900', letterSpacing: 0.3 },
   secondaryButton: {
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md + 2,
@@ -530,6 +594,48 @@ const styles = StyleSheet.create({
   },
   stepTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
   stepBody:  { color: W.muted, fontSize: 14, lineHeight: 21 },
+
+  // SHOWCASE
+  showcaseRow:    { flexDirection: 'row', gap: spacing.md },
+  showcaseColumn: { flexDirection: 'column' },
+  showcaseCard: {
+    flex: 1,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    padding: spacing.lg,
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  showcaseCardWide: { flexBasis: '32%' },
+  phoneFrame: {
+    borderWidth: 2,
+    borderRadius: 28,
+    padding: 6,
+    backgroundColor: W.black,
+    width: '100%',
+    maxWidth: 260,
+    aspectRatio: 9 / 16,
+    overflow: 'hidden',
+    marginBottom: spacing.sm,
+  },
+  phoneImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    borderRadius: 22,
+  },
+  showcaseTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: -0.4,
+    textAlign: 'center',
+  },
+  showcaseBody: {
+    color: W.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
 
   // FEATURES
   featuresBlock: {
