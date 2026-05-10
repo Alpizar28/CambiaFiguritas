@@ -8,7 +8,19 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import Svg, { Path, Circle, Rect, Line, Polyline, Polygon } from 'react-native-svg';
+import Svg, {
+  Path,
+  Circle,
+  Rect,
+  Line,
+  Polyline,
+  Polygon,
+  Defs,
+  RadialGradient,
+  LinearGradient,
+  Stop,
+  G,
+} from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserStore } from '../../store/userStore';
 import { useLandingStore } from '../../store/landingStore';
@@ -241,6 +253,65 @@ const SHOWCASE = [
   },
 ] as const;
 
+// ─── Hero backdrop ────────────────────────────────────────────────────────────
+
+function HeroBackdrop() {
+  return (
+    <Svg
+      width="100%"
+      height="100%"
+      viewBox="0 0 400 600"
+      preserveAspectRatio="xMidYMid slice"
+      style={StyleSheet.absoluteFillObject}
+    >
+      <Defs>
+        <RadialGradient id="glowGold" cx="50%" cy="20%" r="55%">
+          <Stop offset="0%" stopColor="#FFD700" stopOpacity="0.32" />
+          <Stop offset="60%" stopColor="#FFD700" stopOpacity="0.06" />
+          <Stop offset="100%" stopColor="#FFD700" stopOpacity="0" />
+        </RadialGradient>
+        <RadialGradient id="glowGrass" cx="15%" cy="80%" r="55%">
+          <Stop offset="0%" stopColor="#00B341" stopOpacity="0.28" />
+          <Stop offset="60%" stopColor="#00B341" stopOpacity="0.04" />
+          <Stop offset="100%" stopColor="#00B341" stopOpacity="0" />
+        </RadialGradient>
+        <RadialGradient id="glowSky" cx="85%" cy="75%" r="50%">
+          <Stop offset="0%" stopColor="#009FD4" stopOpacity="0.26" />
+          <Stop offset="60%" stopColor="#009FD4" stopOpacity="0.04" />
+          <Stop offset="100%" stopColor="#009FD4" stopOpacity="0" />
+        </RadialGradient>
+        <LinearGradient id="fadeBottom" x1="0%" y1="0%" x2="0%" y2="100%">
+          <Stop offset="0%" stopColor="#0A0A0A" stopOpacity="0" />
+          <Stop offset="100%" stopColor="#0A0A0A" stopOpacity="0.85" />
+        </LinearGradient>
+      </Defs>
+
+      <Rect width="400" height="600" fill="#0A0A0A" />
+      <Rect width="400" height="600" fill="url(#glowGold)" />
+      <Rect width="400" height="600" fill="url(#glowGrass)" />
+      <Rect width="400" height="600" fill="url(#glowSky)" />
+
+      {/* faint pitch lines */}
+      <G opacity="0.06" stroke="#FFFFFF" strokeWidth="1">
+        <Line x1="0" y1="450" x2="400" y2="450" />
+        <Line x1="200" y1="420" x2="200" y2="600" />
+        <Circle cx="200" cy="600" r="80" fill="none" />
+      </G>
+
+      {/* decorative stars / sparkle */}
+      <G fill="#FFD700" opacity="0.4">
+        <Circle cx="60" cy="80" r="1.5" />
+        <Circle cx="340" cy="120" r="1.2" />
+        <Circle cx="280" cy="60" r="1" />
+        <Circle cx="100" cy="180" r="1" />
+        <Circle cx="370" cy="240" r="1.3" />
+      </G>
+
+      <Rect width="400" height="600" fill="url(#fadeBottom)" />
+    </Svg>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function LandingScreen({ onContinueToLogin }: Props) {
@@ -273,39 +344,42 @@ export function LandingScreen({ onContinueToLogin }: Props) {
       showsVerticalScrollIndicator={false}
     >
       {/* ── HERO ── */}
-      <View style={styles.hero}>
+      <View style={styles.heroWrap}>
+        <HeroBackdrop />
+        <View style={styles.hero}>
 
-        {/* pill badge */}
-        <View style={styles.eyebrowRow}>
-          <IconBallSm size={13} color={W.gold} />
-          <Text style={styles.eyebrow}>Mundial FIFA 2026</Text>
-          <View style={styles.eyebrowLive} />
+          {/* pill badge */}
+          <View style={styles.eyebrowRow}>
+            <IconBallSm size={13} color={W.gold} />
+            <Text style={styles.eyebrow}>Mundial FIFA 2026</Text>
+            <View style={styles.eyebrowLive} />
+          </View>
+
+          {/* headline con colores mundialistas */}
+          <Text style={styles.heroTitle}>
+            <Text style={{ color: W.white }}>Completá{'\n'}</Text>
+            <Text style={{ color: W.gold }}>tu álbum,{'\n'}</Text>
+            <Text style={{ color: W.grass }}>encontrá </Text>
+            <Text style={{ color: W.sky }}>matches.</Text>
+          </Text>
+
+          <Text style={styles.heroSubtitle}>
+            La forma inteligente de intercambiar figuritas con coleccionistas reales cerca tuyo.
+          </Text>
+
+          <View style={[styles.ctaRow, !isWide && styles.ctaColumn]}>
+            <Pressable style={styles.primaryButton} onPress={handleStart}>
+              <Text style={styles.primaryButtonText}>Empezar gratis</Text>
+              <IconArrowDark size={20} />
+            </Pressable>
+            <Pressable style={styles.secondaryButton} onPress={handleDemo}>
+              <Text style={styles.secondaryButtonText}>Ver demo</Text>
+              <IconArrowLight size={15} />
+            </Pressable>
+          </View>
+
+          <Text style={styles.heroFootnote}>Sin tarjeta · 669 figuritas oficiales · Panini</Text>
         </View>
-
-        {/* headline con colores mundialistas */}
-        <Text style={styles.heroTitle}>
-          <Text style={{ color: W.white }}>Completá{'\n'}</Text>
-          <Text style={{ color: W.gold }}>tu álbum,{'\n'}</Text>
-          <Text style={{ color: W.grass }}>encontrá </Text>
-          <Text style={{ color: W.sky }}>matches.</Text>
-        </Text>
-
-        <Text style={styles.heroSubtitle}>
-          La forma inteligente de intercambiar figuritas con coleccionistas reales cerca tuyo.
-        </Text>
-
-        <View style={[styles.ctaRow, !isWide && styles.ctaColumn]}>
-          <Pressable style={styles.primaryButton} onPress={handleStart}>
-            <Text style={styles.primaryButtonText}>Empezar gratis</Text>
-            <IconArrowDark size={20} />
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={handleDemo}>
-            <Text style={styles.secondaryButtonText}>Ver demo</Text>
-            <IconArrowLight size={15} />
-          </Pressable>
-        </View>
-
-        <Text style={styles.heroFootnote}>Sin tarjeta · 669 figuritas oficiales · Panini</Text>
       </View>
 
       {/* ── STATS BAR ── */}
@@ -443,12 +517,24 @@ const styles = StyleSheet.create({
   content:   { paddingHorizontal: spacing.lg, gap: spacing.xl },
 
   // HERO
+  heroWrap: {
+    marginHorizontal: -spacing.lg,
+    marginTop: -spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xl + spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+    overflow: 'hidden',
+  },
   hero: {
     paddingTop: spacing.xl,
     paddingBottom: spacing.lg,
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.md,
-    maxWidth: 800,
+    alignSelf: 'center',
+    maxWidth: 720,
+    width: '100%',
   },
   eyebrowRow: {
     flexDirection: 'row',
@@ -479,15 +565,23 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     lineHeight: 52,
     letterSpacing: -1.5,
+    textAlign: 'center',
   },
   heroSubtitle: {
     color: W.muted,
     fontSize: 17,
     lineHeight: 26,
     maxWidth: 460,
+    textAlign: 'center',
   },
-  ctaRow:    { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, flexWrap: 'wrap' },
-  ctaColumn: { flexDirection: 'column', alignSelf: 'stretch' },
+  ctaRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  ctaColumn: { flexDirection: 'column', alignSelf: 'stretch', alignItems: 'center' },
   primaryButton: {
     backgroundColor: W.gold,
     paddingHorizontal: spacing.xl + 8,
@@ -518,7 +612,7 @@ const styles = StyleSheet.create({
     minWidth: 180,
   },
   secondaryButtonText: { color: W.text, fontSize: 16, fontWeight: '700' },
-  heroFootnote: { color: W.dim, fontSize: 12, marginTop: spacing.xs, letterSpacing: 0.2 },
+  heroFootnote: { color: W.dim, fontSize: 12, marginTop: spacing.xs, letterSpacing: 0.2, textAlign: 'center' },
 
   // STATS BAR
   statsBar: {
