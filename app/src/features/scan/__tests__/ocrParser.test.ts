@@ -38,10 +38,9 @@ test('parseToken maps print FWC1 -> internal FW1', () => {
   assert.equal(r?.stickerId, 'FW1');
 });
 
-test('parseToken maps FIFA -> Fifa special', () => {
+test('parseToken rejects FIFA (no existe en catalogo Panini real)', () => {
   const r = parseToken('FIFA', 'FIFA', 0.9);
-  assert.ok(r);
-  assert.equal(r?.stickerId, 'Fifa');
+  assert.equal(r, null);
 });
 
 test('parseToken maps 00 -> Panini logo special', () => {
@@ -149,10 +148,10 @@ test('parseOCRBlocks finds MEX5 amongst noise lines', () => {
   assert.ok(ids.includes('MEX5'));
 });
 
-test('parseOCRBlocks detects FIFA-only token as the Fifa special sticker', () => {
+test('parseOCRBlocks ignores FIFA-only token (no existe en catalogo Panini)', () => {
   const blocks: RecognizedTextBlock[] = [block('FIFA')];
   const r = parseOCRBlocks(blocks);
-  assert.ok(r.some((c) => c.stickerId === 'Fifa'));
+  assert.ok(!r.some((c) => c.stickerId === 'Fifa'));
 });
 
 test('parseOCRBlocks handles tokens separated by punctuation', () => {

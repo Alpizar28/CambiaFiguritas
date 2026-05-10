@@ -1,7 +1,7 @@
 import { countries } from './countries';
 import type { AlbumPage, CountryAlbumPage, CountryStickerGroup, Sticker } from '../types';
 
-const specialCodes = ['Fifa', '00'].concat(
+const specialCodes = ['00'].concat(
   Array.from({ length: 19 }, (_, index) => `FW${index + 1}`),
 );
 
@@ -112,7 +112,7 @@ const specialStickers: Sticker[] = specialCodes.map((internalCode, index) => {
     displayCode,
     slotNumber: index,
     kind: 'special',
-    label: displayCode === 'Fifa' ? 'FIFA' : `Especial ${displayCode}`,
+    label: `Especial ${displayCode}`,
     rarity: 'special',
   };
 });

@@ -9,7 +9,6 @@ const PRINT_PREFIX_TO_INTERNAL: Record<string, string> = {
 };
 
 const STANDALONE_SPECIALS: Record<string, string> = {
-  FIFA: 'Fifa',
   '00': '00',
 };
 
