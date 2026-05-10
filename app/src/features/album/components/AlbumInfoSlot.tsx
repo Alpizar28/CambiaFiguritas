@@ -27,17 +27,25 @@ export function CountryInfoSlot({ name, group, code, flag }: CountryInfoSlotProp
       styles.slot,
       styles.countrySlot,
       isMobile && styles.slotMobile,
+      isMobile && styles.countrySlotMobile,
       { borderColor: accentColor, backgroundColor: slotBg },
     ]}>
-      <Text style={styles.kicker}>We are</Text>
-      <Text numberOfLines={1} style={[styles.countryName, { color: accentColor }]}>{name}</Text>
-      <View style={styles.flagRow}>
+      <Text numberOfLines={1} style={[styles.kicker, isMobile && styles.kickerMobile]}>We are</Text>
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.5}
+        style={[styles.countryName, isMobile && styles.countryNameMobile, { color: accentColor }]}
+      >
+        {name}
+      </Text>
+      <View style={[styles.flagRow, isMobile && styles.flagRowMobile]}>
         {flag ? (
-          <Text style={styles.flagEmoji}>{flag}</Text>
+          <Text style={[styles.flagEmoji, isMobile && styles.flagEmojiMobile]}>{flag}</Text>
         ) : (
           <View style={[styles.flagMark, { borderColor: accentColor }]} />
         )}
-        <Text style={styles.meta}>{code} / {group}</Text>
+        <Text numberOfLines={1} style={[styles.meta, isMobile && styles.metaMobile]}>{code} / {group}</Text>
       </View>
     </View>
   );
@@ -65,12 +73,13 @@ export function GroupInfoSlot({ group, countries, activeCountryId, onSelectCount
       styles.slot,
       styles.groupSlot,
       isMobile && styles.slotMobile,
+      isMobile && styles.groupSlotMobile,
       { borderColor: accent, backgroundColor: bodyBg },
     ]}>
-      <View style={[styles.groupHeader, { backgroundColor: accent }]}>
-        <Text style={[styles.groupLabel, { color: headerText }, noSelect]}>{localizeGroup(group)}</Text>
+      <View style={[styles.groupHeader, isMobile && styles.groupHeaderMobile, { backgroundColor: accent }]}>
+        <Text numberOfLines={1} style={[styles.groupLabel, isMobile && styles.groupLabelMobile, { color: headerText }, noSelect]}>{localizeGroup(group)}</Text>
       </View>
-      <View style={styles.groupBody}>
+      <View style={[styles.groupBody, isMobile && styles.groupBodyMobile]}>
         {countries.map((c) => {
           const isActive = c.id === activeCountryId;
           return (
@@ -81,12 +90,13 @@ export function GroupInfoSlot({ group, countries, activeCountryId, onSelectCount
               disabled={!onSelectCountry || isActive}
               style={({ pressed }) => [
                 styles.groupRow,
+                isMobile && styles.groupRowMobile,
                 isActive && styles.groupRowActive,
                 pressed && !isActive && styles.groupRowPressed,
               ]}
             >
-              <Text style={[styles.groupRowFlag, noSelect]}>{c.flag}</Text>
-              <Text style={[styles.groupRowCode, isActive && styles.groupRowCodeActive, noSelect]}>
+              <Text style={[styles.groupRowFlag, isMobile && styles.groupRowFlagMobile, noSelect]}>{c.flag}</Text>
+              <Text numberOfLines={1} style={[styles.groupRowCode, isMobile && styles.groupRowCodeMobile, isActive && styles.groupRowCodeActive, noSelect]}>
                 {c.code}
               </Text>
             </Pressable>
@@ -111,6 +121,62 @@ const styles = StyleSheet.create({
     flexBasis: 'auto',
     marginBottom: 0,
     minHeight: 0,
+  },
+  countrySlotMobile: {
+    padding: 4,
+    borderWidth: 1.5,
+    justifyContent: 'space-between',
+  },
+  countryNameMobile: {
+    fontSize: 16,
+    letterSpacing: -0.4,
+    lineHeight: 18,
+  },
+  kickerMobile: {
+    fontSize: 9,
+    letterSpacing: 0,
+  },
+  flagRowMobile: {
+    gap: 4,
+    marginTop: 2,
+  },
+  flagEmojiMobile: {
+    fontSize: 14,
+    lineHeight: 16,
+  },
+  metaMobile: {
+    fontSize: 9,
+  },
+  groupSlotMobile: {
+    padding: 0,
+    borderWidth: 1.5,
+  },
+  groupHeaderMobile: {
+    paddingVertical: 2,
+  },
+  groupLabelMobile: {
+    fontSize: 9,
+    letterSpacing: 0.3,
+  },
+  groupBodyMobile: {
+    justifyContent: 'space-evenly',
+    paddingHorizontal: 2,
+    paddingVertical: 2,
+    gap: 1,
+  },
+  groupRowMobile: {
+    flex: 1,
+    paddingHorizontal: 2,
+    paddingVertical: 0,
+    gap: 3,
+  },
+  groupRowFlagMobile: {
+    fontSize: 11,
+    lineHeight: 13,
+  },
+  groupRowCodeMobile: {
+    fontSize: 9,
+    letterSpacing: 0.2,
   },
   countrySlot: {
     backgroundColor: '#FFFDF7',
