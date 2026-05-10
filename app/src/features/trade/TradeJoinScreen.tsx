@@ -6,26 +6,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { joinSession, TradeError } from '../../services/tradeSessionService';
 import { isValidShortCode, normalizeShortCode } from './utils/shortCode';
-import { QRScanner } from './components/QRScanner';
-import { QRScanIcon } from './components/TradeIcons';
 import { useTradeStore } from '../../store/tradeStore';
 import { track } from '../../services/analytics';
 import { colors, radii, spacing } from '../../constants/theme';
 import type { TradeStackParamList } from '../../types/navigation';
-
-const QR_PREFIX = 'cambiafiguritas://trade/';
-
-function extractCodeFromQR(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (trimmed.startsWith(QR_PREFIX)) {
-    return normalizeShortCode(trimmed.slice(QR_PREFIX.length));
-  }
-  const match = trimmed.match(/\/trade\/([A-Za-z0-9]{6})(?![A-Za-z0-9])/);
-  if (match?.[1]) return normalizeShortCode(match[1]);
-  if (/^[A-Za-z0-9]{6}$/.test(trimmed)) return normalizeShortCode(trimmed);
-  return null;
-}
 
 export function TradeJoinScreen() {
   const insets = useSafeAreaInsets();
@@ -34,7 +18,6 @@ export function TradeJoinScreen() {
   const initial = route.params?.prefilledCode ?? '';
   const [code, setCode] = useState(normalizeShortCode(initial));
   const [busy, setBusy] = useState(false);
-  const [scannerOpen, setScannerOpen] = useState(false);
   const setActive = useTradeStore((s) => s.setActive);
 
   const tryJoin = useCallback(
@@ -67,20 +50,6 @@ export function TradeJoinScreen() {
     }
   }, [initial, tryJoin]);
 
-  const handleScan = useCallback(
-    (raw: string) => {
-      setScannerOpen(false);
-      const detected = extractCodeFromQR(raw);
-      if (!detected) {
-        Alert.alert('QR inválido', 'Ese código no parece de intercambio.');
-        return;
-      }
-      setCode(detected);
-      tryJoin(detected);
-    },
-    [tryJoin],
-  );
-
   return (
     <ScrollView
       style={styles.scroll}
@@ -88,25 +57,10 @@ export function TradeJoinScreen() {
     >
       <View style={styles.header}>
         <Text style={styles.eyebrow}>Unirse</Text>
-        <Text style={styles.title}>Escaneá o tipeá el código</Text>
+        <Text style={styles.title}>Tipeá el código</Text>
         <Text style={styles.description}>
           Pediselo a la persona con la que vas a intercambiar. Es de 6 caracteres y dura 10 minutos.
         </Text>
-      </View>
-
-      <Pressable
-        onPress={() => setScannerOpen(true)}
-        disabled={busy}
-        style={({ pressed }) => [styles.scanButton, pressed && styles.pressed, busy && styles.disabled]}
-      >
-        <QRScanIcon size={20} color={colors.text} />
-        <Text style={styles.scanButtonText}>Escanear QR</Text>
-      </Pressable>
-
-      <View style={styles.divider}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>o</Text>
-        <View style={styles.dividerLine} />
       </View>
 
       <View style={styles.codeBox}>
@@ -141,10 +95,6 @@ export function TradeJoinScreen() {
       >
         <Text style={styles.backText}>Volver</Text>
       </Pressable>
-
-      {scannerOpen ? (
-        <QRScanner onResult={handleScan} onClose={() => setScannerOpen(false)} />
-      ) : null}
     </ScrollView>
   );
 }

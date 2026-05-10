@@ -17,7 +17,7 @@ import { useAlbumStore } from '../../store/albumStore';
 import { useMatchStore } from '../../store/matchStore';
 import { useWishlistStore } from '../../store/wishlistStore';
 import { useTradeStore } from '../../store/tradeStore';
-import { HandshakeIcon, HistoryIcon } from '../trade/components/TradeIcons';
+import { HistoryIcon, QRScanIcon } from '../trade/components/TradeIcons';
 import { findMatches, saveUserLocation } from '../../services/matchingService';
 import { consumeMatchSlot, unlockMatchSlot } from '../../services/matchSlotsService';
 import { saveMatchBatch } from '../../services/matchHistoryService';
@@ -427,9 +427,11 @@ export function MatchesScreen() {
         <TouchableOpacity
           onPress={() => useTradeStore.getState().openModal({ kind: 'home' })}
           style={[styles.historyBtn, styles.tradeBtn]}
+          accessibilityRole="button"
+          accessibilityLabel="Intercambio presencial por QR"
         >
-          <HandshakeIcon size={14} color={colors.primary} />
-          <Text style={[styles.historyBtnText, styles.tradeBtnText]}>En persona</Text>
+          <QRScanIcon size={14} color={colors.primary} />
+          <Text style={[styles.historyBtnText, styles.tradeBtnText]}>QR Intercambio</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={goToHistory} style={styles.historyBtn}>
           <HistoryIcon size={14} color={colors.text} />

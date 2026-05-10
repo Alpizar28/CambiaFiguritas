@@ -86,7 +86,7 @@ export function TradeHomeScreen() {
           style={({ pressed }) => [styles.cta, styles.ctaSecondary, pressed && styles.pressed]}
         >
           <Text style={[styles.ctaTitle, styles.ctaTitleSecondary]}>Unirme con código</Text>
-          <Text style={[styles.ctaSub, styles.ctaSubSecondary]}>Escaneá el QR o tipeá el código.</Text>
+          <Text style={[styles.ctaSub, styles.ctaSubSecondary]}>Tipeá el código de 6 caracteres.</Text>
         </Pressable>
       </View>
 
