@@ -88,9 +88,20 @@ export function TradeSelectScreen() {
     [repeatedCounts],
   );
 
-  const myCandidates = useMemo(() => {
-    const set = new Set<string>([...myRepeatedIds, ...draftMine]);
-    return Array.from(set).sort();
+  // Solo se ofrecen repetidas reales del usuario.
+  // Si el draft tiene ids obsoletos (ya no son repetidas), no se muestran.
+  const myCandidates = myRepeatedIds;
+
+  // Limpia draft de ids que dejaron de ser repetidas (ej: usuario las
+  // intercambió o desmarcó desde el album en otro device).
+  useEffect(() => {
+    if (draftMine.length === 0) return;
+    const repeatSet = new Set(myRepeatedIds);
+    const cleaned = draftMine.filter((id) => repeatSet.has(id));
+    if (cleaned.length !== draftMine.length) {
+      setDraftMine(cleaned);
+      setTouched(true);
+    }
   }, [myRepeatedIds, draftMine]);
 
   const handleToggleMine = useCallback((id: string) => {
@@ -206,13 +217,12 @@ export function TradeSelectScreen() {
         </View>
       ) : null}
 
-      <Section title="Lo que doy" countSelected={draftMine.length}>
+      <Section title="Lo que doy (mis repetidas)" countSelected={draftMine.length}>
         {myCandidates.length === 0 ? (
           <Text style={styles.emptyText}>No tenés repetidas todavía. Cargalas desde el álbum.</Text>
         ) : (
           myCandidates.map((id) => {
             const r = rowFor(id);
-            const owned = (repeatedCounts[id] ?? 0) > 0 || statuses[id] === 'repeated';
             return (
               <StickerCheckRow
                 key={id}
@@ -221,7 +231,6 @@ export function TradeSelectScreen() {
                 label={r.label}
                 countryName={r.countryName}
                 selected={draftMine.includes(id)}
-                disabled={!owned && !draftMine.includes(id)}
                 onToggle={handleToggleMine}
               />
             );
@@ -235,17 +244,25 @@ export function TradeSelectScreen() {
         ) : (
           peerOffer.map((id) => {
             const r = rowFor(id);
+            const myStatus = statuses[id];
+            const alreadyHave = myStatus === 'owned' || myStatus === 'repeated';
             return (
-              <StickerCheckRow
-                key={id}
-                stickerId={id}
-                displayCode={r.displayCode}
-                label={r.label}
-                countryName={r.countryName}
-                selected
-                disabled
-                onToggle={() => {}}
-              />
+              <View key={id}>
+                <StickerCheckRow
+                  stickerId={id}
+                  displayCode={r.displayCode}
+                  label={r.label}
+                  countryName={r.countryName}
+                  selected
+                  disabled
+                  onToggle={() => {}}
+                />
+                {alreadyHave ? (
+                  <Text style={styles.dupWarn}>
+                    Ya la tenés ({myStatus === 'repeated' ? 'repetida' : 'pegada'}). Quedará como repetida.
+                  </Text>
+                ) : null}
+              </View>
             );
           })
         )}
@@ -403,6 +420,14 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 13,
     paddingVertical: spacing.sm,
+  },
+  dupWarn: {
+    color: '#FFB85C',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: -spacing.xs,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.sm,
   },
   summary: {
     flexDirection: 'row',

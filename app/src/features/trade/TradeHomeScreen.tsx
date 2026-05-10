@@ -5,6 +5,7 @@ import { useNavigation, type NavigationProp } from '@react-navigation/native';
 
 import { ScreenShell } from '../../components/ScreenShell';
 import { useUserStore } from '../../store/userStore';
+import { useTradeStore } from '../../store/tradeStore';
 import { createSession, findActiveSessionForUser, TradeError } from '../../services/tradeSessionService';
 import { track } from '../../services/analytics';
 import { colors, radii, spacing } from '../../constants/theme';
@@ -15,6 +16,7 @@ export function TradeHomeScreen() {
   const navigation = useNavigation<NavigationProp<TradeStackParamList>>();
   const user = useUserStore((s) => s.user);
   const demoMode = useUserStore((s) => s.demoMode);
+  const closeTradeModal = useTradeStore((s) => s.closeModal);
   const [busy, setBusy] = useState(false);
 
   const handleCreate = useCallback(async () => {
@@ -59,6 +61,18 @@ export function TradeHomeScreen() {
       style={styles.scroll}
       contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + insets.bottom }]}
     >
+      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
+        <Pressable
+          onPress={closeTradeModal}
+          accessibilityRole="button"
+          accessibilityLabel="Cerrar y volver"
+          style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
+          hitSlop={10}
+        >
+          <Text style={styles.backBtnText}>‹ Volver</Text>
+        </Pressable>
+      </View>
+
       <ScreenShell
         eyebrow="Intercambio presencial"
         title="Cambiá figus en persona"
@@ -108,6 +122,20 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingTop: spacing.lg,
+  },
+  topBar: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  backBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.xs,
+    paddingRight: spacing.md,
+  },
+  backBtnText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '700',
   },
   actions: {
     paddingHorizontal: spacing.lg,
