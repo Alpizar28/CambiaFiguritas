@@ -117,7 +117,34 @@ const specialStickers: Sticker[] = specialCodes.map((internalCode, index) => {
   };
 });
 
+// Subcoleccion Coca-Cola: 12 jugadores que vienen fuera de los sobres (en
+// botellas de Coca-Cola US/CA). Opcional para el usuario.
+const cocaColaPlayers = [
+  'Lamine Yamal',
+  'Joshua Kimmich',
+  'Virgil van Dijk',
+  'Antonee Robinson',
+  'Alphonso Davies',
+  'Lautaro Martinez',
+  'Harry Kane',
+  'Edson Alvarez',
+  'Weston McKennie',
+  'Jefferson Lerma',
+  'Santiago Gimenez',
+  'Gabriel Magalhaes',
+];
+
+const cocaColaStickers: Sticker[] = cocaColaPlayers.map((name, index) => ({
+  id: `CC${index + 1}`,
+  displayCode: `CC${index + 1}`,
+  slotNumber: index + 1,
+  kind: 'special',
+  label: name,
+  rarity: 'special',
+}));
+
 export const allStickers = specialStickers.concat(countryStickers);
+export const allStickersWithCocaCola = allStickers.concat(cocaColaStickers);
 
 export const countryStickerGroups: CountryStickerGroup[] = countries.map((country) => ({
   country,
@@ -128,6 +155,12 @@ export const countryStickerGroups: CountryStickerGroup[] = countries.map((countr
 export const specialStickerGroup = {
   country: { id: 'especiales', name: 'Specials', group: 'Specials', code: 'FW' },
   stickers: specialStickers,
+  pages: [] as CountryAlbumPage[],
+};
+
+export const cocaColaStickerGroup = {
+  country: { id: 'cocacola', name: 'Coca-Cola', group: 'Coca-Cola', code: 'CC' },
+  stickers: cocaColaStickers,
   pages: [] as CountryAlbumPage[],
 };
 

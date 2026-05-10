@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { allStickers } from '../features/album/data/albumCatalog';
+import { allStickers, allStickersWithCocaCola } from '../features/album/data/albumCatalog';
 import { track } from '../services/analytics';
 import { haptic } from '../utils/haptics';
 import { isDemoMode } from './userStore';
@@ -30,6 +30,8 @@ type CountryStats = AlbumStats & {
 type AlbumState = {
   statuses: StickerStatusMap;
   repeatedCounts: Record<string, number>;
+  includeCocaCola: boolean;
+  setIncludeCocaCola: (value: boolean) => void;
   setStatus: (stickerId: string, status: StickerStatus) => void;
   markOwned: (stickerId: string) => void;
   markRepeated: (stickerId: string) => void;
@@ -45,7 +47,9 @@ type AlbumState = {
   hasLocalData: () => boolean;
 };
 
-const initialStatuses: StickerStatusMap = allStickers.reduce<StickerStatusMap>(
+// Init incluye Coca-Cola para que CC1..CC12 existan como 'missing' aunque el
+// toggle este off. Cuando el user active el toggle, ya estan listos.
+const initialStatuses: StickerStatusMap = allStickersWithCocaCola.reduce<StickerStatusMap>(
   (acc, sticker) => {
     acc[sticker.id] = 'missing';
     return acc;
@@ -53,7 +57,7 @@ const initialStatuses: StickerStatusMap = allStickers.reduce<StickerStatusMap>(
   {},
 );
 
-const initialRepeatedCounts: Record<string, number> = allStickers.reduce<Record<string, number>>(
+const initialRepeatedCounts: Record<string, number> = allStickersWithCocaCola.reduce<Record<string, number>>(
   (acc, sticker) => {
     acc[sticker.id] = 0;
     return acc;
@@ -66,6 +70,15 @@ export const useAlbumStore = create<AlbumState>()(
     (set, get) => ({
   statuses: initialStatuses,
   repeatedCounts: initialRepeatedCounts,
+  includeCocaCola: false,
+  setIncludeCocaCola: (value) => {
+    if (isDemoMode()) {
+      onDemoWriteAttempt?.();
+      return;
+    }
+    set({ includeCocaCola: value });
+    track({ name: 'album_cocacola_toggled', params: { enabled: value } });
+  },
   setStatus: (stickerId, status) => {
     if (isDemoMode()) {
       onDemoWriteAttempt?.();
@@ -221,7 +234,7 @@ export const useAlbumStore = create<AlbumState>()(
   getStatus: (stickerId) => get().statuses[stickerId] ?? 'missing',
   getRepeatedCount: (stickerId) => get().repeatedCounts[stickerId] ?? 0,
   getStats: () => {
-    const stickers = allStickers;
+    const stickers = get().includeCocaCola ? allStickersWithCocaCola : allStickers;
     const statuses = get().statuses;
     const repeatedCounts = get().repeatedCounts;
     const owned = stickers.filter((sticker) => {

@@ -9,10 +9,13 @@ const accentByCode: Map<string, string> = new Map(
 
 // Acento dorado para grupo de especiales (FW).
 const SPECIAL_ACCENT = '#FFD600';
+// Rojo Coca-Cola para subcoleccion opcional (CC).
+const COCACOLA_ACCENT = '#F40009';
 
 export function getCountryAccent(code: string | undefined, fallback: string = colors.primary): string {
   if (!code) return fallback;
   if (code === 'FW') return SPECIAL_ACCENT;
+  if (code === 'CC') return COCACOLA_ACCENT;
   return accentByCode.get(code) ?? countryColors[code] ?? fallback;
 }
 

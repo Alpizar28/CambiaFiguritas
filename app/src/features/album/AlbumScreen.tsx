@@ -20,7 +20,7 @@ import { ContextMenu } from './components/ContextMenu';
 import { RepeatCounterMenu } from './components/RepeatCounterMenu';
 import { ConnectedStickerCard } from './components/ConnectedStickerCard';
 import { StickerActionSheet } from './components/StickerActionSheet';
-import { allStickers, countryStickerGroups, specialStickerGroup } from './data/albumCatalog';
+import { allStickers, cocaColaStickerGroup, countryStickerGroups, specialStickerGroup } from './data/albumCatalog';
 import { haptic } from '../../utils/haptics';
 import { track } from '../../services/analytics';
 import { Tooltip } from '../../components/Tooltip';
@@ -42,44 +42,41 @@ const filters: Array<{ label: string; value: AlbumFilter }> = [
   { label: 'Especiales', value: 'special' },
 ];
 
-const stickerGroups = countryStickerGroups.concat(specialStickerGroup);
+const baseStickerGroups = countryStickerGroups.concat(specialStickerGroup);
 
-const stickersByCode: Map<string, { sticker: Sticker; groupIndex: number }> = new Map();
-stickerGroups.forEach((group, groupIndex) => {
-  group.stickers.forEach((sticker) => {
-    stickersByCode.set(sticker.displayCode.toLowerCase(), { sticker, groupIndex });
-  });
-});
-
-// Detecta búsqueda por código directo: "ARG12", "FWC1", "12 argentina", "argentina 12"
-function parseDirectCode(rawQuery: string): { sticker: Sticker; groupIndex: number } | null {
-  const q = rawQuery.trim().toLowerCase();
-  if (q.length < 2) return null;
-  const direct = stickersByCode.get(q);
-  if (direct) return direct;
-  // Alias: si el user escribe "fw1" (codigo interno viejo), redirigir a "fwc1"
-  // que es el codigo real impreso en el album.
-  if (/^fw\d+$/.test(q)) {
-    const aliased = stickersByCode.get(`fwc${q.slice(2)}`);
-    if (aliased) return aliased;
-  }
-  // "12 argentina" o "argentina 12": split en palabras + número
-  const numMatch = q.match(/^(.+?)\s+(\d{1,3})$|^(\d{1,3})\s+(.+)$/);
-  if (!numMatch) return null;
-  const word = (numMatch[1] || numMatch[4] || '').trim();
-  const num = numMatch[2] || numMatch[3];
-  if (!word || !num) return null;
-  const groupIdx = stickerGroups.findIndex(
-    (g) =>
-      g.country.name.toLowerCase().includes(word) ||
-      g.country.code.toLowerCase() === word.toLowerCase(),
-  );
-  if (groupIdx < 0) return null;
-  const group = stickerGroups[groupIdx];
-  const numInt = parseInt(num, 10);
-  const sticker = group.stickers.find((s) => s.slotNumber === numInt);
-  if (!sticker) return null;
-  return { sticker, groupIndex: groupIdx };
+// parseDirectCode toma stickerGroups como param porque depende de includeCocaCola
+// (el grupo CC solo aparece cuando el toggle esta on).
+function makeParseDirectCode(
+  stickerGroups: typeof baseStickerGroups,
+  stickersByCode: Map<string, { sticker: Sticker; groupIndex: number }>,
+) {
+  // Detecta búsqueda por código directo: "ARG12", "FWC1", "12 argentina", "argentina 12"
+  return function parseDirectCode(rawQuery: string): { sticker: Sticker; groupIndex: number } | null {
+    const q = rawQuery.trim().toLowerCase();
+    if (q.length < 2) return null;
+    const direct = stickersByCode.get(q);
+    if (direct) return direct;
+    if (/^fw\d+$/.test(q)) {
+      const aliased = stickersByCode.get(`fwc${q.slice(2)}`);
+      if (aliased) return aliased;
+    }
+    const numMatch = q.match(/^(.+?)\s+(\d{1,3})$|^(\d{1,3})\s+(.+)$/);
+    if (!numMatch) return null;
+    const word = (numMatch[1] || numMatch[4] || '').trim();
+    const num = numMatch[2] || numMatch[3];
+    if (!word || !num) return null;
+    const groupIdx = stickerGroups.findIndex(
+      (g) =>
+        g.country.name.toLowerCase().includes(word) ||
+        g.country.code.toLowerCase() === word.toLowerCase(),
+    );
+    if (groupIdx < 0) return null;
+    const group = stickerGroups[groupIdx];
+    const numInt = parseInt(num, 10);
+    const sticker = group.stickers.find((s) => s.slotNumber === numInt);
+    if (!sticker) return null;
+    return { sticker, groupIndex: groupIdx };
+  };
 }
 
 const matchesQuery = (sticker: Sticker, normalizedQuery: string) => {
@@ -153,8 +150,31 @@ export function AlbumScreen() {
   const incrementRepeated = useAlbumStore((state) => state.incrementRepeated);
   const decrementRepeated = useAlbumStore((state) => state.decrementRepeated);
   const getStats = useAlbumStore((state) => state.getStats);
+  const includeCocaCola = useAlbumStore((s) => s.includeCocaCola);
+  const setIncludeCocaCola = useAlbumStore((s) => s.setIncludeCocaCola);
 
-  const activeGroup = stickerGroups[activeGroupIndex];
+  const stickerGroups = useMemo(
+    () => (includeCocaCola ? baseStickerGroups.concat(cocaColaStickerGroup) : baseStickerGroups),
+    [includeCocaCola],
+  );
+
+  const stickersByCode = useMemo(() => {
+    const map = new Map<string, { sticker: Sticker; groupIndex: number }>();
+    stickerGroups.forEach((group, groupIndex) => {
+      group.stickers.forEach((sticker) => {
+        map.set(sticker.displayCode.toLowerCase(), { sticker, groupIndex });
+      });
+    });
+    return map;
+  }, [stickerGroups]);
+
+  const parseDirectCode = useMemo(
+    () => makeParseDirectCode(stickerGroups, stickersByCode),
+    [stickerGroups, stickersByCode],
+  );
+
+  const safeActiveIndex = Math.min(activeGroupIndex, stickerGroups.length - 1);
+  const activeGroup = stickerGroups[safeActiveIndex];
   const activeAccent = getCountryAccent(activeGroup.country.code);
   const activeAccentTint = tintWithAlpha(activeAccent, 0.12);
   const stats = getStats();
@@ -410,6 +430,21 @@ export function AlbumScreen() {
           <View style={styles.mobileProgressBar}>
             <View style={[styles.mobileProgressFill, { width: `${Math.min(100, Math.max(0, stats.progress))}%` as any }]} />
           </View>
+
+          {isSpecials && (
+            <Pressable
+              onPress={() => { haptic.tap(); setIncludeCocaCola(!includeCocaCola); }}
+              style={styles.cocaToggleRow}
+              accessibilityLabel="Incluir subcoleccion Coca-Cola"
+            >
+              <Text style={styles.cocaToggleText} numberOfLines={1}>
+                Coca-Cola (12) — {includeCocaCola ? 'incluida' : 'no incluida'}
+              </Text>
+              <View style={[styles.cocaSwitch, includeCocaCola && styles.cocaSwitchOn]}>
+                <View style={[styles.cocaSwitchKnob, includeCocaCola && styles.cocaSwitchKnobOn]} />
+              </View>
+            </Pressable>
+          )}
 
           {searchOpen && (
             <View>
@@ -943,6 +978,45 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: '#FFD600',
     borderRadius: 2,
+  },
+  cocaToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.xs,
+    backgroundColor: 'rgba(244,0,9,0.10)',
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(244,0,9,0.40)',
+  },
+  cocaToggleText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    flex: 1,
+  },
+  cocaSwitch: {
+    width: 36,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    padding: 2,
+    justifyContent: 'center',
+  },
+  cocaSwitchOn: {
+    backgroundColor: '#F40009',
+  },
+  cocaSwitchKnob: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  cocaSwitchKnobOn: {
+    alignSelf: 'flex-end',
   },
   mobileScroll: {
     flex: 1,

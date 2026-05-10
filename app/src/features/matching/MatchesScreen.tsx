@@ -75,8 +75,29 @@ export function MatchesScreen() {
   const user = useUserStore((s) => s.user);
   const uid = user?.uid;
   const isPremium = ENABLE_PREMIUM_UI && user?.premium === true;
-  const statuses = useAlbumStore((s) => s.statuses);
-  const wishlist = useWishlistStore((s) => s.items);
+  const rawStatuses = useAlbumStore((s) => s.statuses);
+  const includeCocaCola = useAlbumStore((s) => s.includeCocaCola);
+  const rawWishlist = useWishlistStore((s) => s.items);
+
+  // Si el user no incluye Coca-Cola, filtrar CC* de statuses y wishlist para
+  // que el matching no use esos stickers en el scoring.
+  const statuses = useMemo(() => {
+    if (includeCocaCola) return rawStatuses;
+    const filtered: typeof rawStatuses = {};
+    for (const id in rawStatuses) {
+      if (!id.startsWith('CC')) filtered[id] = rawStatuses[id];
+    }
+    return filtered;
+  }, [rawStatuses, includeCocaCola]);
+
+  const wishlist = useMemo(() => {
+    if (includeCocaCola) return rawWishlist;
+    const filtered: typeof rawWishlist = {};
+    for (const id in rawWishlist) {
+      if (!id.startsWith('CC')) filtered[id] = rawWishlist[id];
+    }
+    return filtered;
+  }, [rawWishlist, includeCocaCola]);
   const { matches, loading, error, lastFetched, setMatches, setLoading, setError } = useMatchStore();
   const coordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const filterInitializedRef = useRef(false);
