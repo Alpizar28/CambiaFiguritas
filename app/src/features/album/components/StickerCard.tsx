@@ -88,7 +88,9 @@ function StickerCardImpl({
       style={({ pressed }) => [
         styles.card,
         colSpan === 2
-          ? styles.doubleCard
+          ? isMobile
+            ? styles.doubleCardMobile
+            : styles.doubleCard
           : isMobile
           ? styles.singleCardMobile
           : styles.singleCard,
@@ -166,8 +168,9 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   singleCard: { flexBasis: '23.5%' },
-  singleCardMobile: { flexBasis: '31%', minHeight: 90 },
+  singleCardMobile: { width: '100%', height: '100%', minHeight: 0, marginBottom: 0 },
   doubleCard: { flexBasis: '49%' },
+  doubleCardMobile: { width: '100%', height: '100%', minHeight: 0, marginBottom: 0 },
 
   highlighted: {
     borderColor: '#FFD700',

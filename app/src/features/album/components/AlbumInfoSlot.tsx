@@ -1,4 +1,4 @@
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { colors, radii, spacing } from '../../../constants/theme';
 import type { Country } from '../types';
@@ -17,11 +17,18 @@ type CountryInfoSlotProps = {
 };
 
 export function CountryInfoSlot({ name, group, code, flag }: CountryInfoSlotProps) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 900;
   const accentColor = getCountryAccent(code, colors.primary);
   const slotBg = tintWithAlpha(accentColor, 0.10);
 
   return (
-    <View style={[styles.slot, styles.countrySlot, { borderColor: accentColor, backgroundColor: slotBg }]}>
+    <View style={[
+      styles.slot,
+      styles.countrySlot,
+      isMobile && styles.slotMobile,
+      { borderColor: accentColor, backgroundColor: slotBg },
+    ]}>
       <Text style={styles.kicker}>We are</Text>
       <Text numberOfLines={1} style={[styles.countryName, { color: accentColor }]}>{name}</Text>
       <View style={styles.flagRow}>
@@ -47,12 +54,19 @@ type GroupInfoSlotProps = {
 const localizeGroup = (group: string) => group.replace(/^Group\s/i, 'Grupo ');
 
 export function GroupInfoSlot({ group, countries, activeCountryId, onSelectCountry, accentColor }: GroupInfoSlotProps) {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 900;
   const accent = accentColor ?? '#D9272D';
   const headerText = pickReadableTextOn(accent);
   const bodyBg = tintWithAlpha(accent, 0.10);
 
   return (
-    <View style={[styles.slot, styles.groupSlot, { borderColor: accent, backgroundColor: bodyBg }]}>
+    <View style={[
+      styles.slot,
+      styles.groupSlot,
+      isMobile && styles.slotMobile,
+      { borderColor: accent, backgroundColor: bodyBg },
+    ]}>
       <View style={[styles.groupHeader, { backgroundColor: accent }]}>
         <Text style={[styles.groupLabel, { color: headerText }, noSelect]}>{localizeGroup(group)}</Text>
       </View>
@@ -90,6 +104,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     minHeight: 96,
     padding: spacing.sm,
+  },
+  slotMobile: {
+    width: '100%',
+    height: '100%',
+    flexBasis: 'auto',
+    marginBottom: 0,
+    minHeight: 0,
   },
   countrySlot: {
     backgroundColor: '#FFFDF7',

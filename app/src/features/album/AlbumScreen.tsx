@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Dimensions,
+  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,6 +9,8 @@ import {
   TextInput,
   useWindowDimensions,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -117,6 +120,7 @@ const COUNTRY_BTN_WIDTH = 70;
 
 export function AlbumScreen() {
   const { width } = useWindowDimensions();
+  const [activePageIndex, setActivePageIndex] = useState(0);
   const insets = useSafeAreaInsets();
   const isDesktop = width >= 900;
   const uid = useUserStore((s) => s.user?.uid);
@@ -136,6 +140,7 @@ export function AlbumScreen() {
 
   const countryScrollerRef = useRef<ScrollView>(null);
   const pagerRef = useRef<ScrollView>(null);
+  const mobilePagerRef = useRef<FlatList<CountryAlbumPage>>(null);
 
   const statuses = useAlbumStore((state) => state.statuses);
   const repeatedCounts = useAlbumStore((state) => state.repeatedCounts);
@@ -277,7 +282,9 @@ export function AlbumScreen() {
   // Reset page al cambiar de país
   useEffect(() => {
     setActiveCountryPage(1);
+    setActivePageIndex(0);
     pagerRef.current?.scrollTo({ x: 0, animated: false });
+    mobilePagerRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, [activeGroupIndex]);
 
   const moveCountry = (direction: -1 | 1) => {
@@ -359,6 +366,48 @@ export function AlbumScreen() {
     );
   };
 
+  const getSlotSpan = (slot: AlbumSlot): number => {
+    if (slot.type === 'country_info') return 2;
+    if (slot.type === 'group_info') return 1;
+    return slot.colSpan ?? 1;
+  };
+
+  // Chunking de slots en filas de 4 columnas respetando colSpan (1 o 2).
+  const chunkSlotsByRows = (slots: AlbumSlot[]): AlbumSlot[][] => {
+    const rows: AlbumSlot[][] = [];
+    let current: AlbumSlot[] = [];
+    let used = 0;
+    for (const slot of slots) {
+      const span = getSlotSpan(slot);
+      if (used + span > 4) {
+        rows.push(current);
+        current = [];
+        used = 0;
+      }
+      current.push(slot);
+      used += span;
+    }
+    if (current.length) rows.push(current);
+    return rows;
+  };
+
+  const renderMobileSlot = (slot: AlbumSlot, index: number) => {
+    const span = getSlotSpan(slot);
+    const key = `m-slot-${slot.type === 'sticker' ? slot.stickerId : slot.type}-${index}`;
+    // Empty: skip wrapper, just placeholder con flex.
+    if (slot.type === 'sticker') {
+      const sticker = stickersById[slot.stickerId];
+      if (!sticker || !shouldShowSticker(sticker)) {
+        return <View key={key} style={{ flex: span }} />;
+      }
+    }
+    return (
+      <View key={key} style={[styles.mobileCellWrap, { flex: span }]}>
+        {renderSlot(slot, index)}
+      </View>
+    );
+  };
+
   const renderAlbumPage = (page: CountryAlbumPage, pageWidth?: number) => (
     <View
       key={page.pageInCountry}
@@ -371,6 +420,25 @@ export function AlbumScreen() {
       <View style={styles.originalGrid}>{page.slots.map(renderSlot)}</View>
     </View>
   );
+
+  const renderMobileAlbumPage = (page: CountryAlbumPage) => {
+    const rows = chunkSlotsByRows(page.slots);
+    return (
+      <View style={styles.mobileAlbumPage}>
+        <View style={styles.pageTopline}>
+          <Text style={styles.pageLabel}>Pagina {page.pageInCountry}</Text>
+          <Text style={[styles.pageCode, { color: activeAccent }]}>{activeGroup.country.code}</Text>
+        </View>
+        <View style={styles.mobileGrid}>
+          {rows.map((row, rIdx) => (
+            <View key={`row-${rIdx}`} style={styles.mobileRow}>
+              {row.map((slot, sIdx) => renderMobileSlot(slot, rIdx * 4 + sIdx))}
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
 
   const sheetSticker = sheetStickerId ? stickersById[sheetStickerId] ?? null : null;
 
@@ -580,13 +648,13 @@ export function AlbumScreen() {
           </View>
         </View>
 
-        {/* Páginas — scroll vertical, una debajo de la otra */}
-        <ScrollView
-          style={styles.mobileScroll}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 120, gap: spacing.sm }}
-          showsVerticalScrollIndicator={false}
-        >
-          {isSpecials ? (
+        {/* Páginas — paginado horizontal, 1 página por pantalla */}
+        {isSpecials ? (
+          <ScrollView
+            style={styles.mobileScroll}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 120, gap: spacing.sm }}
+            showsVerticalScrollIndicator={false}
+          >
             <View style={styles.mobilePage}>
               <View style={styles.originalGrid}>
                 {visibleStickers.map((sticker) => (
@@ -599,10 +667,39 @@ export function AlbumScreen() {
                 ))}
               </View>
             </View>
-          ) : (
-            activeGroup.pages.map((item) => renderAlbumPage(item, pageWidth))
-          )}
-        </ScrollView>
+          </ScrollView>
+        ) : (
+          <View style={styles.mobilePagerWrap}>
+            <FlatList
+              ref={mobilePagerRef}
+              data={activeGroup.pages}
+              keyExtractor={(p) => `page-${p.pageInCountry}`}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / width);
+                if (idx !== activePageIndex) setActivePageIndex(idx);
+              }}
+              renderItem={({ item }) => (
+                <View style={{ width }}>{renderMobileAlbumPage(item)}</View>
+              )}
+            />
+            <View style={[styles.pageDots, { paddingBottom: insets.bottom + spacing.sm }]}>
+              {activeGroup.pages.map((p, i) => (
+                <View
+                  key={`dot-${p.pageInCountry}`}
+                  style={[
+                    styles.pageDot,
+                    i === activePageIndex && { backgroundColor: activeAccent, width: 24 },
+                  ]}
+                />
+              ))}
+            </View>
+          </View>
+        )}
 
         <StickerActionSheet
           visible={!!sheetSticker}
@@ -1050,6 +1147,46 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
+  mobilePagerWrap: {
+    flex: 1,
+  },
+  mobileAlbumPage: {
+    flex: 1,
+    backgroundColor: '#FAF6E8',
+    borderColor: '#E8DEC2',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: spacing.sm,
+    margin: spacing.sm,
+  },
+  mobileGrid: {
+    flex: 1,
+    flexDirection: 'column',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  mobileRow: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  mobileCellWrap: {
+    flexDirection: 'row',
+    minWidth: 0,
+  },
+  pageDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingTop: spacing.sm,
+  },
+  pageDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
 
   // ----- COMPARTIDO -----
   workspace: {
@@ -1310,6 +1447,10 @@ const styles = StyleSheet.create({
     flexBasis: '49%',
     marginBottom: spacing.sm,
     minHeight: 78,
+  },
+  emptySlotMobile: {
+    width: '100%',
+    height: '100%',
   },
   bookFold: {
     alignSelf: 'stretch',
