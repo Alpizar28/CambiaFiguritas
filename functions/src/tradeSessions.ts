@@ -198,6 +198,13 @@ export const joinTradeSession = onCall<JoinPayload>(
         status: 'paired',
       });
 
+      // Lock single-active-session para el guest también.
+      tx.set(db.doc(`tradeUserLocks/${guestUid}`), {
+        sessionId: sessionRef.id,
+        expiresAt: session.expiresAt,
+        updatedAt: now,
+      });
+
       return {
         ok: true,
         sessionId: sessionRef.id,

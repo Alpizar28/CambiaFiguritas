@@ -5,6 +5,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTradeSession } from '../../hooks/useTradeSession';
+import { usePeerAlbum } from '../../hooks/usePeerAlbum';
+import { peerNeedsSticker } from './utils/tradeSuggestion';
 import { useUserStore } from '../../store/userStore';
 import { useAlbumStore } from '../../store/albumStore';
 import {
@@ -67,8 +69,10 @@ export function TradeSelectScreen() {
   const myOffer = role === 'host' ? session?.hostStickers ?? [] : session?.guestStickers ?? [];
   const peerOffer = role === 'host' ? session?.guestStickers ?? [] : session?.hostStickers ?? [];
   const peerName = role === 'host' ? session?.guestName : session?.hostName;
+  const peerUid = role === 'host' ? session?.guestUid ?? null : session?.hostUid ?? null;
   const myConfirmedAt = role === 'host' ? session?.hostConfirmedAt : session?.guestConfirmedAt;
   const peerConfirmedAt = role === 'host' ? session?.guestConfirmedAt : session?.hostConfirmedAt;
+  const { album: peerAlbum, loaded: peerAlbumLoaded } = usePeerAlbum(peerUid);
 
   const [draftMine, setDraftMine] = useState<string[]>([]);
   const [touched, setTouched] = useState(false);
@@ -88,10 +92,31 @@ export function TradeSelectScreen() {
     [repeatedCounts],
   );
 
+  // Solo se ofrecen repetidas que el peer realmente necesite.
+  // Si el peer aún no tiene album cargado, asumimos que necesita todo
+  // (peer nuevo / sin marcar) — mejor mostrar opciones que esconder todo.
   const myCandidates = useMemo(() => {
-    const set = new Set<string>([...myRepeatedIds, ...draftMine]);
-    return Array.from(set).sort();
-  }, [myRepeatedIds, draftMine]);
+    if (!peerAlbumLoaded) return myRepeatedIds;
+    if (!peerAlbum) return myRepeatedIds; // peer sin album → no podemos filtrar
+    return myRepeatedIds.filter((id) => peerNeedsSticker(peerAlbum.statuses, id));
+  }, [myRepeatedIds, peerAlbum, peerAlbumLoaded]);
+
+  // Limpia draft de ids que dejaron de ser repetidas o que el peer ya no necesita.
+  useEffect(() => {
+    if (draftMine.length === 0) return;
+    const candSet = new Set(myCandidates);
+    const cleaned = draftMine.filter((id) => candSet.has(id));
+    if (cleaned.length !== draftMine.length) {
+      setDraftMine(cleaned);
+      setTouched(true);
+    }
+  }, [myCandidates, draftMine]);
+
+  const noMatchAtAll =
+    peerAlbumLoaded &&
+    !!peerAlbum &&
+    myCandidates.length === 0 &&
+    peerOffer.length === 0;
 
   const handleToggleMine = useCallback((id: string) => {
     setTouched(true);
@@ -206,13 +231,26 @@ export function TradeSelectScreen() {
         </View>
       ) : null}
 
-      <Section title="Lo que doy" countSelected={draftMine.length}>
-        {myCandidates.length === 0 ? (
+      {noMatchAtAll ? (
+        <View style={styles.bannerWarn}>
+          <Text style={styles.bannerWarnText}>
+            No hay figus útiles entre ustedes dos. Cancelá y probá con otra persona.
+          </Text>
+        </View>
+      ) : null}
+
+      <Section title="Lo que doy (útiles para el otro)" countSelected={draftMine.length}>
+        {!peerAlbumLoaded ? (
+          <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.md }} />
+        ) : myRepeatedIds.length === 0 ? (
           <Text style={styles.emptyText}>No tenés repetidas todavía. Cargalas desde el álbum.</Text>
+        ) : myCandidates.length === 0 ? (
+          <Text style={styles.emptyText}>
+            Ninguna de tus repetidas le sirve al otro. Probá con otra persona.
+          </Text>
         ) : (
           myCandidates.map((id) => {
             const r = rowFor(id);
-            const owned = (repeatedCounts[id] ?? 0) > 0 || statuses[id] === 'repeated';
             return (
               <StickerCheckRow
                 key={id}
@@ -221,7 +259,6 @@ export function TradeSelectScreen() {
                 label={r.label}
                 countryName={r.countryName}
                 selected={draftMine.includes(id)}
-                disabled={!owned && !draftMine.includes(id)}
                 onToggle={handleToggleMine}
               />
             );
@@ -231,21 +268,31 @@ export function TradeSelectScreen() {
 
       <Section title="Lo que recibo" countSelected={peerOffer.length}>
         {peerOffer.length === 0 ? (
-          <Text style={styles.emptyText}>El otro todavía no eligió nada.</Text>
+          <Text style={styles.emptyText}>
+            El otro todavía no eligió nada útil para vos.
+          </Text>
         ) : (
           peerOffer.map((id) => {
             const r = rowFor(id);
+            const myStatus = statuses[id];
+            const alreadyHave = myStatus === 'owned' || myStatus === 'repeated';
             return (
-              <StickerCheckRow
-                key={id}
-                stickerId={id}
-                displayCode={r.displayCode}
-                label={r.label}
-                countryName={r.countryName}
-                selected
-                disabled
-                onToggle={() => {}}
-              />
+              <View key={id}>
+                <StickerCheckRow
+                  stickerId={id}
+                  displayCode={r.displayCode}
+                  label={r.label}
+                  countryName={r.countryName}
+                  selected
+                  disabled
+                  onToggle={() => {}}
+                />
+                {alreadyHave ? (
+                  <Text style={styles.dupWarn}>
+                    Ya la tenés ({myStatus === 'repeated' ? 'repetida' : 'pegada'}). Quedará como repetida.
+                  </Text>
+                ) : null}
+              </View>
             );
           })
         )}
@@ -403,6 +450,14 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 13,
     paddingVertical: spacing.sm,
+  },
+  dupWarn: {
+    color: '#FFB85C',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: -spacing.xs,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.sm,
   },
   summary: {
     flexDirection: 'row',

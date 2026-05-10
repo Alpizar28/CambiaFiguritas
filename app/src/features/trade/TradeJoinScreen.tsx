@@ -19,6 +19,7 @@ export function TradeJoinScreen() {
   const [code, setCode] = useState(normalizeShortCode(initial));
   const [busy, setBusy] = useState(false);
   const setActive = useTradeStore((s) => s.setActive);
+  const closeTradeModal = useTradeStore((s) => s.closeModal);
 
   const tryJoin = useCallback(
     async (rawCode: string) => {
@@ -55,6 +56,18 @@ export function TradeJoinScreen() {
       style={styles.scroll}
       contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + insets.bottom }]}
     >
+      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
+        <Pressable
+          onPress={closeTradeModal}
+          accessibilityRole="button"
+          accessibilityLabel="Cerrar y volver"
+          style={({ pressed }) => [styles.backTopBtn, pressed && styles.pressed]}
+          hitSlop={10}
+        >
+          <Text style={styles.backTopBtnText}>‹ Cerrar</Text>
+        </Pressable>
+      </View>
+
       <View style={styles.header}>
         <Text style={styles.eyebrow}>Unirse</Text>
         <Text style={styles.title}>Tipeá el código</Text>
@@ -90,7 +103,10 @@ export function TradeJoinScreen() {
       </View>
 
       <Pressable
-        onPress={() => navigation.goBack()}
+        onPress={() => {
+          if (navigation.canGoBack()) navigation.goBack();
+          else closeTradeModal();
+        }}
         style={({ pressed }) => [styles.back, pressed && styles.pressed]}
       >
         <Text style={styles.backText}>Volver</Text>
@@ -106,6 +122,19 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
+  },
+  topBar: {
+    paddingBottom: spacing.sm,
+  },
+  backTopBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.xs,
+    paddingRight: spacing.md,
+  },
+  backTopBtnText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '700',
   },
   header: {
     backgroundColor: colors.card,

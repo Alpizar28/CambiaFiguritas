@@ -1,6 +1,20 @@
 import type { AlbumSnapshot } from '../../../services/albumSyncService';
+import type { StickerStatus } from '../../album/types';
 
 const MAX_SUGGESTION = 25;
+
+/**
+ * Determina si el peer necesita un sticker dado.
+ * Necesita = no lo tiene (missing) o no aparece en sus statuses.
+ * Owned/repeated/special significa que ya lo tiene → NO lo necesita.
+ */
+export function peerNeedsSticker(
+  peerStatuses: Record<string, StickerStatus> | undefined,
+  stickerId: string,
+): boolean {
+  const status = peerStatuses?.[stickerId];
+  return !status || status === 'missing';
+}
 
 /**
  * Sugiere stickers que `giver` puede entregar a `receiver`:
