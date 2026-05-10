@@ -1,4 +1,5 @@
 import { countries } from './countries';
+import { playerNames } from './playerNames';
 import type { AlbumPage, CountryAlbumPage, CountryStickerGroup, Sticker } from '../types';
 
 const specialCodes = ['00'].concat(
@@ -21,17 +22,23 @@ const getStickerKind = (slotNumber: number): Sticker['kind'] => {
   return 'player';
 };
 
-const getStickerLabel = (slotNumber: number) => {
+const getStickerLabel = (countryCode: string, slotNumber: number): string => {
   if (slotNumber === 1) {
     return 'Escudo';
   }
 
-  if (slotNumber === 2) {
-    return 'Portero';
-  }
-
   if (slotNumber === 13) {
     return 'Foto grupal';
+  }
+
+  const name = playerNames[`${countryCode}${slotNumber}`];
+  if (name) {
+    return name;
+  }
+
+  // Fallback defensivo: slot 2 sin nombre en map -> "Portero"
+  if (slotNumber === 2) {
+    return 'Portero';
   }
 
   return '';
@@ -95,7 +102,7 @@ const countryStickers = countries.flatMap<Sticker>((country) =>
       group: country.group,
       kind: getStickerKind(slotNumber),
       playerNumber: slotNumber,
-      label: getStickerLabel(slotNumber),
+      label: getStickerLabel(country.code, slotNumber),
       rarity: slotNumber === 1 || slotNumber === 13 ? 'special' : 'normal',
     };
   }),
@@ -125,13 +132,13 @@ const cocaColaPlayers = [
   'Virgil van Dijk',
   'Antonee Robinson',
   'Alphonso Davies',
-  'Lautaro Martinez',
+  'Lautaro Martínez',
   'Harry Kane',
-  'Edson Alvarez',
+  'Edson Álvarez',
   'Weston McKennie',
   'Jefferson Lerma',
-  'Santiago Gimenez',
-  'Gabriel Magalhaes',
+  'Santiago Giménez',
+  'Gabriel Magalhães',
 ];
 
 const cocaColaStickers: Sticker[] = cocaColaPlayers.map((name, index) => ({
