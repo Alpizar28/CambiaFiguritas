@@ -542,8 +542,8 @@ export function MatchesScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.eyebrow}>Intercambios cerca tuyo</Text>
-          <Text style={styles.title}>Matches</Text>
+          <Text style={styles.eyebrow} numberOfLines={1}>Intercambios cerca tuyo</Text>
+          <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Matches</Text>
         </View>
         <TouchableOpacity
           onPress={() => useTradeStore.getState().openModal({ kind: 'home' })}
@@ -855,6 +855,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   historyBtn: {
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
