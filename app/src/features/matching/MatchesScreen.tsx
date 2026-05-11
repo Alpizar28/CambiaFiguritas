@@ -148,9 +148,11 @@ export function MatchesScreen() {
         myName: user?.name ?? 'Yo',
         myPhotoUrl: myPhotoDataUrlRef.current ?? user?.photoUrl ?? undefined,
         myCity: user?.city ?? undefined,
+        myPremium: user?.premium === true,
         theirName: isAnonymous ? 'Coleccionista' : m.user.name,
         theirPhotoUrl: isAnonymous ? undefined : (m.user.photoUrl ?? undefined),
         theirCity: isAnonymous ? undefined : (m.user.city ?? undefined),
+        theirPremium: !isAnonymous && m.user.premium === true,
         iGiveIds: m.theyNeedIds,
         iGiveTotal: m.theyNeedFromMe,
         iReceiveIds: m.iNeedIds,
@@ -375,7 +377,7 @@ export function MatchesScreen() {
         cascadeResult.matches,
         isPremium ? PREMIUM_TOP_N : FREE_TOP_N,
       );
-      if (batchToSave.length > 0) {
+      if (batchToSave.length > 0 && isPremium) {
         saveMatchBatch(uid, {
           createdAt: Date.now(),
           filterUsed: filter,
@@ -466,8 +468,13 @@ export function MatchesScreen() {
   }, [navigation]);
 
   const goToHistory = useCallback(() => {
+    if (!isPremium) {
+      track({ name: 'match_history_paywall_shown' });
+      navigation.navigate('Profile');
+      return;
+    }
     setHistoryOpen(true);
-  }, []);
+  }, [isPremium, navigation]);
 
   const myRepeated = Object.values(statuses).filter((s) => s === 'repeated').length;
   const myMissing = Object.values(statuses).filter((s) => s === 'missing').length;
@@ -557,7 +564,9 @@ export function MatchesScreen() {
         </TouchableOpacity>
         <TouchableOpacity onPress={goToHistory} style={styles.historyBtn}>
           <HistoryIcon size={14} color={colors.text} />
-          <Text style={styles.historyBtnText}>Historial</Text>
+          <Text style={styles.historyBtnText}>
+            Historial{!isPremium ? ' 🔒' : ''}
+          </Text>
         </TouchableOpacity>
       </View>
 

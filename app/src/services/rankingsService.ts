@@ -14,6 +14,7 @@ export type RankingEntry = {
   totalStickers: number;
   reputationUp: number;
   reputationCount: number;
+  premium: boolean;
 };
 
 const TOTAL_STICKERS = allStickers.length;
@@ -27,6 +28,7 @@ type AggregatedDoc = {
     ownedCount: number;
     reputationUp: number;
     reputationCount: number;
+    premium?: boolean;
   }>;
 };
 
@@ -60,5 +62,6 @@ export async function getRankings(
     totalStickers: TOTAL_STICKERS,
     reputationUp: e.reputationUp,
     reputationCount: e.reputationCount,
+    premium: e.premium === true,
   }));
 }

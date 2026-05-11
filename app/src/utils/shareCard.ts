@@ -686,9 +686,11 @@ export type VsCardConfig = {
   myName: string;
   myPhotoUrl?: string;
   myCity?: string;
+  myPremium?: boolean;
   theirName: string;
   theirPhotoUrl?: string;
   theirCity?: string;
+  theirPremium?: boolean;
   iGiveIds: string[];
   iGiveTotal: number;
   iReceiveIds: string[];
@@ -749,9 +751,41 @@ async function drawVsAvatar(
   ctx.stroke();
 }
 
+function drawCrownCanvas(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number): void {
+  // Estética del CrownIcon: 3 picos + base + 3 puntos. Color dorado.
+  const s = size / 24;
+  const x = cx - size / 2;
+  const y = cy - size / 2;
+  ctx.save();
+  ctx.fillStyle = '#FFD700';
+  ctx.strokeStyle = '#FFD700';
+  ctx.lineWidth = 1.2 * s;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x + 3 * s, y + 8 * s);
+  ctx.lineTo(x + 7 * s, y + 12 * s);
+  ctx.lineTo(x + 12 * s, y + 5 * s);
+  ctx.lineTo(x + 17 * s, y + 12 * s);
+  ctx.lineTo(x + 21 * s, y + 8 * s);
+  ctx.lineTo(x + 19 * s, y + 19 * s);
+  ctx.lineTo(x + 5 * s, y + 19 * s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  const dot = (dx: number, dy: number) => {
+    ctx.beginPath();
+    ctx.arc(x + dx * s, y + dy * s, 1.4 * s, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  dot(3, 8);
+  dot(21, 8);
+  dot(12, 5);
+  ctx.restore();
+}
+
 async function drawVsCard(ctx: CanvasRenderingContext2D, config: VsCardConfig): Promise<void> {
-  const { myUid, myName, myCity, myPhotoUrl, theirName, theirCity, theirPhotoUrl,
-    iGiveIds, iGiveTotal, iReceiveIds, iReceiveTotal, isPerfectTrade } = config;
+  const { myUid, myName, myCity, myPhotoUrl, myPremium, theirName, theirCity, theirPhotoUrl,
+    theirPremium, iGiveIds, iGiveTotal, iReceiveIds, iReceiveTotal, isPerfectTrade } = config;
 
   // Background
   drawBg(ctx);
@@ -796,18 +830,31 @@ async function drawVsCard(ctx: CanvasRenderingContext2D, config: VsCardConfig): 
   // Names
   ctx.textAlign = 'center';
   ctx.font = '800 42px system-ui, sans-serif';
-  ctx.fillStyle = C.white;
 
-  const maxNameW = halfW - 80;
+  const nameY = avY + avR + 60;
+  const crownSize = 44;
+  const crownGap = 12;
+  const maxNameW = halfW - 80 - (crownSize + crownGap);
+
   let myNameTxt = myName || 'Yo';
   while (ctx.measureText(myNameTxt).width > maxNameW && myNameTxt.length > 2) myNameTxt = myNameTxt.slice(0, -1);
   if (myNameTxt !== (myName || 'Yo')) myNameTxt += '…';
-  ctx.fillText(myNameTxt, halfW / 2, avY + avR + 60);
+  ctx.fillStyle = myPremium ? '#FFD700' : C.white;
+  ctx.fillText(myNameTxt, halfW / 2, nameY);
+  if (myPremium) {
+    const myNameW = ctx.measureText(myNameTxt).width;
+    drawCrownCanvas(ctx, halfW / 2 - myNameW / 2 - crownSize / 2 - crownGap, nameY - 18, crownSize);
+  }
 
   let theirNameTxt = theirName || 'Match';
   while (ctx.measureText(theirNameTxt).width > maxNameW && theirNameTxt.length > 2) theirNameTxt = theirNameTxt.slice(0, -1);
   if (theirNameTxt !== (theirName || 'Match')) theirNameTxt += '…';
-  ctx.fillText(theirNameTxt, halfW + halfW / 2, avY + avR + 60);
+  ctx.fillStyle = theirPremium ? '#FFD700' : C.white;
+  ctx.fillText(theirNameTxt, halfW + halfW / 2, nameY);
+  if (theirPremium) {
+    const theirNameW = ctx.measureText(theirNameTxt).width;
+    drawCrownCanvas(ctx, halfW + halfW / 2 - theirNameW / 2 - crownSize / 2 - crownGap, nameY - 18, crownSize);
+  }
 
   // Cities
   ctx.font = '500 30px system-ui, sans-serif';

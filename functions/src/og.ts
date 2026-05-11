@@ -18,6 +18,7 @@ type UserDoc = {
   privacyHideProgress?: boolean;
   privacyHideRepeated?: boolean;
   privacyAnonymous?: boolean;
+  premium?: boolean;
 };
 
 function escapeXml(s: string): string {
@@ -68,6 +69,7 @@ type ShareData = {
   repeated: number;
   missing: number;
   pct: number;
+  premium: boolean;
 };
 
 async function loadShareData(uid: string): Promise<ShareData | null> {
@@ -96,6 +98,7 @@ async function loadShareData(uid: string): Promise<ShareData | null> {
     repeated: hideProgress || hideRepeated ? 0 : rawRepeated,
     missing: hideProgress ? 0 : rawMissing,
     pct: hideProgress ? 0 : rawPct,
+    premium: !anonymous && user.premium === true,
   };
 }
 
@@ -103,6 +106,11 @@ function buildSvg(data: ShareData): string {
   const safeName = escapeXml(data.name);
   const safeCity = escapeXml(data.city);
   const barWidth = Math.max(0, Math.min(100, data.pct)) * 8.4;
+  const nameFill = data.premium ? '#FFD700' : '#FFFFFF';
+  const nameX = data.premium ? 110 : 48;
+  const crownSvg = data.premium
+    ? `<g transform="translate(48, 130) scale(2.5)"><path d="M3 8l4 4 5-7 5 7 4-4-2 11H5L3 8z" fill="#FFD700" stroke="#FFD700" stroke-width="1.2" stroke-linejoin="round"/><circle cx="3" cy="8" r="1.4" fill="#FFD700"/><circle cx="21" cy="8" r="1.4" fill="#FFD700"/><circle cx="12" cy="5" r="1.4" fill="#FFD700"/></g>`
+    : '';
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -126,7 +134,8 @@ function buildSvg(data: ShareData): string {
   <text x="48" y="96" font-family="system-ui, sans-serif" font-size="14" font-weight="500" fill="#6B7280">Mundial 2026</text>
 
   <!-- User name & city -->
-  <text x="48" y="175" font-family="system-ui, sans-serif" font-size="52" font-weight="900" fill="#FFFFFF">${safeName}</text>
+  ${crownSvg}
+  <text x="${nameX}" y="175" font-family="system-ui, sans-serif" font-size="52" font-weight="900" fill="${nameFill}">${safeName}</text>
   ${safeCity ? `<text x="48" y="210" font-family="system-ui, sans-serif" font-size="20" font-weight="500" fill="#A0A0A0">📍 ${safeCity}</text>` : ''}
 
   <!-- Big percentage -->

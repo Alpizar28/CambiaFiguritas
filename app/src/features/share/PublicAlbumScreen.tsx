@@ -18,6 +18,8 @@ import {
 } from '../album/data/albumCatalog';
 import type { CountryStickerGroup } from '../album/types';
 import { colors, radii, spacing } from '../../constants/theme';
+import { ENABLE_PREMIUM_UI } from '../../constants/featureFlags';
+import { CrownIcon } from '../../components/icons/CrownIcon';
 
 const APP_URL = 'https://cambiafiguritas.online';
 
@@ -264,7 +266,17 @@ export function PublicAlbumScreen({ uid, onExitToApp }: Props) {
             </View>
           )}
           <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{data.user.name}</Text>
+            <View style={styles.nameRow}>
+              <Text
+                style={[
+                  styles.name,
+                  ENABLE_PREMIUM_UI && data.user.premium && styles.namePremium,
+                ]}
+              >
+                {data.user.name}
+              </Text>
+              {ENABLE_PREMIUM_UI && data.user.premium ? <CrownIcon size={18} /> : null}
+            </View>
             {data.user.city ? <Text style={styles.city}>{data.user.city}</Text> : null}
             {isHidden ? (
               <Text style={styles.headerStats}>Progreso privado</Text>
@@ -404,6 +416,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   name: { color: colors.text, fontSize: 20, fontWeight: '700' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  namePremium: { color: '#FFD700' },
   city: { color: colors.textMuted, fontSize: 14 },
   headerStats: { color: colors.textMuted, fontSize: 12, marginTop: 4 },
   pct: { color: colors.accent, fontSize: 16, fontWeight: '800', marginTop: 4 },

@@ -15,6 +15,8 @@ import { getRankings } from '../../services/rankingsService';
 import type { RankingEntry, RankingScope } from '../../services/rankingsService';
 import { track } from '../../services/analytics';
 import { colors, radii, spacing } from '../../constants/theme';
+import { ENABLE_PREMIUM_UI } from '../../constants/featureFlags';
+import { PremiumBadge } from '../../components/PremiumBadge';
 
 const MEDALS: Record<number, string> = { 0: '🥇', 1: '🥈', 2: '🥉' };
 
@@ -138,7 +140,15 @@ function RankingRow({ entry, position }: { entry: RankingEntry; position: number
         </View>
       )}
       <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>{entry.name}</Text>
+        <View style={styles.nameRow}>
+          <Text
+            style={[styles.name, ENABLE_PREMIUM_UI && entry.premium && styles.namePremium]}
+            numberOfLines={1}
+          >
+            {entry.name}
+          </Text>
+          {ENABLE_PREMIUM_UI && entry.premium ? <PremiumBadge size="sm" /> : null}
+        </View>
         <Text style={styles.meta} numberOfLines={1}>
           {entry.city || 'Sin ciudad'}
           {repPercent != null ? ` · 👍 ${repPercent}%` : ''}
@@ -253,10 +263,19 @@ const styles = StyleSheet.create({
   info: {
     flex: 1,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   name: {
     color: colors.text,
     fontSize: 14,
     fontWeight: '700',
+    flexShrink: 1,
+  },
+  namePremium: {
+    color: '#FFD700',
   },
   meta: {
     color: colors.textMuted,

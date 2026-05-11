@@ -7,6 +7,7 @@ export type PublicAlbumPayload = {
     city: string;
     photoUrl: string | null;
     anonymous?: boolean;
+    premium?: boolean;
   };
   album: {
     statuses: Record<string, PublicAlbumStatus>;

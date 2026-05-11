@@ -102,6 +102,7 @@ type AnalyticsEvent =
   | { name: 'matches_filter_fellback'; params: { preferred: string; applied: string } }
   | { name: 'match_batch_saved'; params: { size: number; filter: string } }
   | { name: 'match_history_opened'; params: { batchCount: number } }
+  | { name: 'match_history_paywall_shown' }
   | { name: 'match_history_batch_expanded'; params: { batchId: string; ageDays: number } }
   | { name: 'match_history_whatsapp_clicked'; params: { matchUid: string; ageDays: number } }
   | { name: 'match_share_clicked'; params: { isPerfectTrade: boolean; matchUid: string } }

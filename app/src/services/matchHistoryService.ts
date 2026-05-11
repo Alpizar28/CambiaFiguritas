@@ -39,7 +39,7 @@ export type MatchBatch = {
   matches: MatchHistoryEntry[];
 };
 
-const FREE_KEEP = 30;
+const FREE_KEEP = 0;
 const PREMIUM_KEEP = 90;
 const MAX_LIST = 100;
 

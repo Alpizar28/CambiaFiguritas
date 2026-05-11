@@ -12,6 +12,7 @@ type UserDoc = {
   city?: string;
   reputationUp?: number;
   reputationCount?: number;
+  premium?: boolean;
 };
 
 type RankingEntry = {
@@ -22,6 +23,7 @@ type RankingEntry = {
   ownedCount: number;
   reputationUp: number;
   reputationCount: number;
+  premium: boolean;
 };
 
 const TOP_N = 10;
@@ -76,6 +78,7 @@ async function aggregate(): Promise<{ global: number; cities: number }> {
       ownedCount: c.ownedCount,
       reputationUp: user.reputationUp ?? 0,
       reputationCount: user.reputationCount ?? 0,
+      premium: user.premium === true,
     });
   });
 

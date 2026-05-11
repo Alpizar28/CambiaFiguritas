@@ -17,6 +17,7 @@ type UserDoc = {
   privacyHideProgress?: boolean;
   privacyHideRepeated?: boolean;
   privacyAnonymous?: boolean;
+  premium?: boolean;
 };
 
 type PublicAlbumResponse = {
@@ -26,6 +27,7 @@ type PublicAlbumResponse = {
     city: string;
     photoUrl: string | null;
     anonymous: boolean;
+    premium: boolean;
   };
   album: {
     statuses: Record<string, 'missing' | 'owned' | 'repeated' | 'special'>;
@@ -139,6 +141,7 @@ export const getPublicAlbum = onRequest(
           city: anonymous ? '' : (user.city ?? '').slice(0, 80),
           photoUrl: anonymous ? null : (user.photoUrl ?? null),
           anonymous,
+          premium: !anonymous && user.premium === true,
         },
         album: {
           statuses: hideProgress ? {} : statuses,
