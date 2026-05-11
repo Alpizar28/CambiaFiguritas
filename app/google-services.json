@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "1058576446766-6qv1hpntchjo5jdvq9cbd5si3rnealsa.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cambiafiguritas.app",
+            "certificate_hash": "a2508e33cdf69b9acc222151bfdaa47479a107ea"
+          }
+        },
+        {
+          "client_id": "1058576446766-ouul34ghmao4i652kb6ctvviu5cgi7e5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cambiafiguritas.app",
+            "certificate_hash": "e8338691effddeacfff6bc756d604bc19ffe95fe"
+          }
+        },
+        {
           "client_id": "1058576446766-r6ktjd5ptkg0h44trgc0a2lbab3001r8.apps.googleusercontent.com",
           "client_type": 3
         }

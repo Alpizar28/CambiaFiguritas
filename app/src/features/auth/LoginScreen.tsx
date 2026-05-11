@@ -22,6 +22,10 @@ import { PRIVACY_TEXT, TERMS_TEXT } from '../profile/legalContent';
 WebBrowser.maybeCompleteAuthSession();
 
 const WEB_CLIENT_ID = '1058576446766-r6ktjd5ptkg0h44trgc0a2lbab3001r8.apps.googleusercontent.com';
+// Android OAuth Client ID — auto-creado por Firebase con SHA-1 de Play App Signing
+// (E8:33:86:91:EF:FD:DE:AC:FF:F6:BC:75:6D:60:4B:C1:9F:FE:95:FE).
+// Package: com.cambiafiguritas.app
+const ANDROID_CLIENT_ID = '1058576446766-ouul34ghmao4i652kb6ctvviu5cgi7e5.apps.googleusercontent.com';
 
 const redirectUri = makeRedirectUri({ scheme: 'cambiafiguritas' });
 
@@ -55,6 +59,7 @@ export function LoginScreen() {
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: WEB_CLIENT_ID,
+    androidClientId: ANDROID_CLIENT_ID,
     redirectUri,
   });
 
@@ -68,14 +73,26 @@ export function LoginScreen() {
         setSigningIn(false);
         return;
       }
-      const credential = GoogleAuthProvider.credential(id_token);
-      signInWithCredential(auth, credential).catch((e) => {
-        setError('Error al iniciar sesión. Intentá de nuevo.');
+      try {
+        const credential = GoogleAuthProvider.credential(id_token);
+        signInWithCredential(auth, credential).catch((e: any) => {
+          const code = e?.code ?? '';
+          const msg = e?.message ?? String(e);
+          setError(`Login Firebase falló: ${code || msg}`);
+          setSigningIn(false);
+          console.error('[Firebase signInWithCredential]', e);
+        });
+      } catch (e: any) {
+        setError(`Error armando credential: ${e?.message ?? String(e)}`);
         setSigningIn(false);
-        console.error(e);
-      });
+        console.error('[Credential build]', e);
+      }
     } else if (response?.type === 'error') {
-      setError('Error en autenticación con Google.');
+      const errMsg = response?.error?.message ?? response?.params?.error_description ?? 'desconocido';
+      setError(`Error Google: ${errMsg}`);
+      setSigningIn(false);
+      console.error('[Google auth response error]', response);
+    } else if (response?.type === 'dismiss' || response?.type === 'cancel') {
       setSigningIn(false);
     }
   }, [response]);
@@ -104,7 +121,13 @@ export function LoginScreen() {
         setSigningIn(false);
       }
     } else {
-      promptAsync();
+      try {
+        await promptAsync();
+      } catch (e: any) {
+        setError(`No se pudo abrir Google: ${e?.message ?? String(e)}`);
+        setSigningIn(false);
+        console.error('[promptAsync]', e);
+      }
     }
   };
 
