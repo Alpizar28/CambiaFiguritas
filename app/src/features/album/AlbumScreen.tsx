@@ -659,12 +659,13 @@ export function AlbumScreen() {
             <View style={styles.mobilePage}>
               <View style={styles.originalGrid}>
                 {visibleStickers.map((sticker) => (
-                  <ConnectedStickerCard
-                    key={sticker.id}
-                    sticker={sticker}
-                    highlighted={highlightedStickerId === sticker.id}
-                    onLongPress={handleLongPress}
-                  />
+                  <View key={sticker.id} style={styles.originalGridCell}>
+                    <ConnectedStickerCard
+                      sticker={sticker}
+                      highlighted={highlightedStickerId === sticker.id}
+                      onLongPress={handleLongPress}
+                    />
+                  </View>
                 ))}
               </View>
             </View>
@@ -1549,6 +1550,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+  },
+  originalGridCell: {
+    flexBasis: '23.5%',
+    flexGrow: 0,
+    flexShrink: 0,
   },
   emptySlot: {
     flexBasis: '23.5%',
