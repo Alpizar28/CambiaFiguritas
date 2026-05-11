@@ -24,7 +24,7 @@ App multiplataforma para gestionar el álbum del **Mundial 2026**, encontrar int
 - ⭐ **Score combinado**: necesidades mutuas + wishlist boost + distancia.
 - 🤝 **Intercambio perfecto**: badge dorado cuando swap recíproco balanceado.
 - ✓ **Verified badge**: usuarios con ≥20 reputaciones y ≥85% positivas.
-- 🛡️ **Cap diario server-enforced**: 3 búsquedas/día free (premium ilimitado), recompensable con anuncios.
+- 🛡️ **Cap diario server-enforced**: 1 búsqueda/día free (premium ilimitado).
 
 ### Eventos por zona
 - 📍 **Filtro estricto**: GPS preferido (radio dinámico) + fallback `user.city` slug.
@@ -33,7 +33,7 @@ App multiplataforma para gestionar el álbum del **Mundial 2026**, encontrar int
 - 🚫 **NoLocationBanner** si user sin GPS ni ciudad.
 
 ### Monetización
-- ✨ **Premium USD 2.99** pago único cross-platform: Web (TiloPay) + Android (Play Billing).
+- ✨ **Premium USD 3.99** pago único — actualmente solo Web (TiloPay). Android (Play Billing) listo en código, en pausa esperando aprobación Play Console.
 - 🔄 **Cross-platform sync**: misma cuenta Google → premium se refleja en segundos vía `onSnapshot`.
 - 💸 **Audit trail**: subcollection `users/{uid}/entitlements/{source}` con idempotencia por externalId.
 - 🎬 **Rewarded ads**: countdown 15s+ desbloquea +1 match cap diario.
@@ -397,7 +397,7 @@ Detalles completos en [`MANUAL_SETUP.md`](./MANUAL_SETUP.md) y [`tasks/pendiente
 
 **Críticos para producción real:**
 - [ ] **TiloPay**: generar API keys + webhook secret, configurar en Functions secrets, confirmar payload con soporte. Hoy modo stub.
-- [ ] **Google Play Console**: USD 25 fee + applicationId `com.cambiafiguritas.app` + producto IAP `cf_premium_lifetime` USD 2.99 + service account para `verifyPlayPurchase`.
+- [ ] **Google Play Console**: USD 25 fee + applicationId `com.cambiafiguritas.app` + producto IAP `cf_premium_lifetime` USD 3.99 + service account para `verifyPlayPurchase`.
 - [ ] **EAS dev build**: instalar `react-native-iap` + build interno para probar Play Billing real.
 - [ ] **AdMob real**: reemplazar test IDs por banners + rewarded + interstitial reales + UMP consent (Europa/GDPR).
 - [ ] **Maps SDK Android API key** en `app/app.json`.

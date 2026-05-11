@@ -5,7 +5,6 @@ import { functions } from '../../../services/firebase';
 import { useUserStore } from '../../../store/userStore';
 import { track } from '../../../services/analytics';
 import { colors, radii, spacing } from '../../../constants/theme';
-import { purchasePremium } from '../../../services/playBilling';
 import { ENABLE_PREMIUM_UI } from '../../../constants/featureFlags';
 
 type Props = {
@@ -31,21 +30,19 @@ export function PremiumCard({ variant = 'full' }: Props) {
   if (!ENABLE_PREMIUM_UI) return null;
   if (user?.premium) return null;
 
+  const isAndroid = Platform.OS === 'android';
+
   const handleUpgrade = async () => {
     if (loading) return;
+    if (Platform.OS === 'android') {
+      setError('Próximamente en Android. Por ahora podés hacerte Premium desde cambiafiguritas.online.');
+      return;
+    }
     setLoading(true);
     setError(null);
     track({ name: 'premium_checkout_started' });
 
     try {
-      if (Platform.OS === 'android') {
-        const result = await purchasePremium();
-        if (!result.success) {
-          setError('No se pudo completar la compra');
-        }
-        return;
-      }
-
       // Web (PWA / iOS) → TiloPay
       const result = await createTilopayCheckoutFn({});
       const { checkoutUrl, orderId, stub } = result.data;
@@ -57,7 +54,7 @@ export function PremiumCard({ variant = 'full' }: Props) {
 
       if (Platform.OS === 'web') {
         if (typeof window !== 'undefined') {
-          window.open(checkoutUrl, '_blank');
+          window.location.href = checkoutUrl;
         }
       } else {
         await Linking.openURL(checkoutUrl);
@@ -93,17 +90,17 @@ export function PremiumCard({ variant = 'full' }: Props) {
       <View style={styles.compactCard}>
         <View style={styles.compactInfo}>
           <Text style={styles.compactTitle}>✨ Hacete Premium</Text>
-          <Text style={styles.compactSubtitle}>Matches ilimitados · Sin anuncios · USD 2.99</Text>
+          <Text style={styles.compactSubtitle}>Matches ilimitados · Sin anuncios · USD 3.99</Text>
         </View>
         <TouchableOpacity
-          style={styles.compactBtn}
+          style={[styles.compactBtn, isAndroid && styles.compactBtnDisabled]}
           onPress={handleUpgrade}
-          disabled={loading}
+          disabled={loading || isAndroid}
         >
           {loading ? (
             <ActivityIndicator color="#0A0A0A" />
           ) : (
-            <Text style={styles.compactBtnText}>Comprar</Text>
+            <Text style={styles.compactBtnText}>{isAndroid ? 'Próximamente' : 'Comprar'}</Text>
           )}
         </TouchableOpacity>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -128,21 +125,23 @@ export function PremiumCard({ variant = 'full' }: Props) {
         <Benefit icon="⭐" label="Estrella dorada en tu perfil" />
       </View>
       <TouchableOpacity
-        style={styles.upgradeBtn}
+        style={[styles.upgradeBtn, isAndroid && styles.upgradeBtnDisabled]}
         onPress={handleUpgrade}
-        disabled={loading}
+        disabled={loading || isAndroid}
       >
         {loading ? (
           <ActivityIndicator color="#0A0A0A" />
         ) : (
           <>
-            <Text style={styles.upgradeBtnText}>Hacete Premium</Text>
-            <Text style={styles.upgradeBtnPrice}>USD 2.99 · pago único</Text>
+            <Text style={styles.upgradeBtnText}>{isAndroid ? 'Próximamente en Android' : 'Hacete Premium'}</Text>
+            {!isAndroid ? <Text style={styles.upgradeBtnPrice}>USD 3.99 · pago único</Text> : null}
           </>
         )}
       </TouchableOpacity>
       <Text style={styles.fineprint}>
-        Pago único de por vida del álbum. Sin renovaciones.
+        {isAndroid
+          ? 'Pronto vas a poder comprarlo desde Google Play. Por ahora, hacelo desde cambiafiguritas.online.'
+          : 'Pago único de por vida del álbum. Sin renovaciones.'}
       </Text>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <StubPaymentModal
@@ -249,6 +248,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 2,
   },
+  upgradeBtnDisabled: {
+    opacity: 0.5,
+  },
   upgradeBtnText: {
     color: '#0A0A0A',
     fontSize: 16,
@@ -303,6 +305,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     minWidth: 80,
     alignItems: 'center',
+  },
+  compactBtnDisabled: {
+    opacity: 0.5,
   },
   compactBtnText: {
     color: '#0A0A0A',

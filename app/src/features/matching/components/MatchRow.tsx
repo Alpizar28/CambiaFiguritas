@@ -3,6 +3,7 @@ import type { Match } from '../../../services/matchingService';
 import { formatDistance } from '../../../utils/distance';
 import { colors, radii, spacing } from '../../../constants/theme';
 import { ENABLE_PREMIUM_UI } from '../../../constants/featureFlags';
+import { PremiumBadge } from '../../../components/PremiumBadge';
 
 type Props = {
   match: Match;
@@ -69,10 +70,16 @@ export function MatchRow({ match, onPress, compact }: Props) {
 
       <View style={styles.info}>
         <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>
+          <Text
+            style={[
+              styles.name,
+              ENABLE_PREMIUM_UI && user.premium && styles.namePremium,
+            ]}
+            numberOfLines={1}
+          >
             {user.name}
           </Text>
-          {ENABLE_PREMIUM_UI && user.premium ? <Text style={styles.premiumStar}>⭐</Text> : null}
+          {ENABLE_PREMIUM_UI && user.premium ? <PremiumBadge size="sm" /> : null}
           {isVerified ? <Text style={styles.verifiedDot}>✓</Text> : null}
         </View>
         <Text style={styles.subtitle} numberOfLines={1}>
@@ -162,8 +169,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     flexShrink: 1,
   },
-  premiumStar: {
-    fontSize: 12,
+  namePremium: {
+    color: '#FFD700',
   },
   verifiedDot: {
     color: '#16A34A',

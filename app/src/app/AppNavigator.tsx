@@ -5,8 +5,10 @@ import {
   NavigationIndependentTree,
   DarkTheme,
 } from '@react-navigation/native';
-import type { NavigationContainerRef, LinkingOptions } from '@react-navigation/native';
+import type { LinkingOptions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+
+import { navigationRef } from './navigationRef';
 
 import { colors } from '../constants/theme';
 import { track } from '../services/analytics';
@@ -76,7 +78,6 @@ const linking: LinkingOptions<RootTabParamList> = {
 };
 
 export function AppNavigator() {
-  const navRef = useRef<NavigationContainerRef<RootTabParamList>>(null);
   const previousRoute = useRef<string | undefined>(undefined);
   const [publicAlbumUid, setPublicAlbumUid] = useState<string | null>(null);
   const tradeIntent = useTradeStore((s) => s.modalIntent);
@@ -102,7 +103,7 @@ export function AppNavigator() {
   }, []);
 
   const onStateChange = () => {
-    const current = navRef.current?.getCurrentRoute()?.name;
+    const current = navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name : undefined;
     if (current && current !== previousRoute.current) {
       track({ name: 'screen_view', params: { screen: current } });
       previousRoute.current = current;
@@ -112,7 +113,7 @@ export function AppNavigator() {
   return (
     <>
       <NavigationContainer
-        ref={navRef}
+        ref={navigationRef}
         theme={navigationTheme}
         linking={linking}
         onReady={() => {

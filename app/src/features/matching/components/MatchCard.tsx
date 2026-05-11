@@ -9,6 +9,7 @@ import { recordReputationVote } from '../../../services/userService';
 import { useUserStore } from '../../../store/userStore';
 import { colors, spacing, radii } from '../../../constants/theme';
 import { ENABLE_PREMIUM_UI } from '../../../constants/featureFlags';
+import { PremiumBadge } from '../../../components/PremiumBadge';
 import { vsCardToBlob, renderVsCardToCanvas, type VsCardConfig } from '../../../utils/shareCard';
 import { useGooglePhotoDataUrl } from '../../../utils/useGooglePhotoDataUrl';
 
@@ -209,8 +210,16 @@ export function MatchCard({ match, onPress }: Props) {
         )}
         <View style={styles.info}>
           <View style={styles.nameRow}>
-            <Text style={styles.name} numberOfLines={1}>{displayName}</Text>
-            {ENABLE_PREMIUM_UI && !isAnonymous && user.premium ? <Text style={styles.premiumStar}>⭐</Text> : null}
+            <Text
+              style={[
+                styles.name,
+                ENABLE_PREMIUM_UI && !isAnonymous && user.premium && styles.namePremium,
+              ]}
+              numberOfLines={1}
+            >
+              {displayName}
+            </Text>
+            {ENABLE_PREMIUM_UI && !isAnonymous && user.premium ? <PremiumBadge size="md" /> : null}
             {!isAnonymous && isVerified ? (
               <View style={styles.verifiedChip}>
                 <Text style={styles.verifiedChipText}>✓ Verificado</Text>
@@ -587,8 +596,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
-  premiumStar: {
-    fontSize: 14,
+  namePremium: {
+    color: '#FFD700',
   },
   header: {
     flexDirection: 'row',

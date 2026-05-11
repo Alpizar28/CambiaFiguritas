@@ -29,7 +29,7 @@
  *
  * @see docs/PREMIUM-DISABLED.md para contexto histórico.
  */
-export const ENABLE_PREMIUM_UI = false;
+export const ENABLE_PREMIUM_UI = true;
 
 /**
  * Cap diario de búsquedas de matches para usuarios sin premium.
@@ -38,4 +38,4 @@ export const ENABLE_PREMIUM_UI = false;
  * Solo se usa en mensajes UI ("Te quedan X de Y búsquedas hoy"). El cap real
  * lo aplica el backend en `consumeMatchSlot` para evitar bypass cliente.
  */
-export const FREE_MATCH_CAP_DISPLAY = 5;
+export const FREE_MATCH_CAP_DISPLAY = 1;

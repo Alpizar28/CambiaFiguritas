@@ -37,6 +37,7 @@ import { MatchLockCard } from './components/MatchLockCard';
 import { RewardedAdModal } from './components/RewardedAdModal';
 import { PremiumCard } from '../profile/components/PremiumCard';
 import { AdBanner } from '../../components/AdBanner';
+import { isAdMobAvailable } from '../../services/ads';
 import { MatchCardSkeleton } from '../../components/Skeleton';
 import {
   cascadeZoneFilter,
@@ -595,7 +596,7 @@ export function MatchesScreen() {
           resetAt={lockState.resetAt}
           onWatchAd={handleWatchAd}
           onGoPremium={handleGoPremium}
-          adAvailable={!adLoading}
+          adAvailable={!adLoading && isAdMobAvailable()}
           adReason={adReason}
         />
       ) : matches.length === 0 && !loading && !lastFetched ? (

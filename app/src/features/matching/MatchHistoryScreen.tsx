@@ -24,6 +24,7 @@ import { formatDistance } from '../../utils/distance';
 import { track } from '../../services/analytics';
 import { colors, radii, spacing } from '../../constants/theme';
 import { ENABLE_PREMIUM_UI } from '../../constants/featureFlags';
+import { PremiumBadge } from '../../components/PremiumBadge';
 
 const FILTER_LABELS: Record<string, string> = {
   mi_ciudad: 'Mi ciudad',
@@ -185,10 +186,16 @@ function HistoryRow({
       )}
       <View style={styles.info}>
         <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>
+          <Text
+            style={[
+              styles.name,
+              ENABLE_PREMIUM_UI && entry.premium && styles.namePremium,
+            ]}
+            numberOfLines={1}
+          >
             {entry.name}
           </Text>
-          {ENABLE_PREMIUM_UI && entry.premium ? <Text style={styles.premiumStar}>⭐</Text> : null}
+          {ENABLE_PREMIUM_UI && entry.premium ? <PremiumBadge size="sm" /> : null}
         </View>
         <Text style={styles.subtitle} numberOfLines={1}>
           {subtitleParts.join(' · ') || 'Sin ubicación'}
@@ -287,8 +294,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     flexShrink: 1,
   },
-  premiumStar: {
-    fontSize: 11,
+  namePremium: {
+    color: '#FFD700',
   },
   subtitle: {
     color: colors.textMuted,

@@ -40,21 +40,22 @@ export function MatchLockCard({
       </Text>
 
       <View style={styles.actions}>
-        <TouchableOpacity
-          style={[styles.adButton, !adAvailable && styles.adButtonDisabled]}
-          onPress={onWatchAd}
-          disabled={!adAvailable}
-        >
-          <Text style={styles.adButtonText}>
-            🎬 Mirá un anuncio (+1 match)
-          </Text>
-          {adReason ? <Text style={styles.adButtonHint}>{adReason}</Text> : null}
-        </TouchableOpacity>
+        {adAvailable ? (
+          <TouchableOpacity
+            style={styles.adButton}
+            onPress={onWatchAd}
+          >
+            <Text style={styles.adButtonText}>
+              🎬 Mirá un anuncio (+1 match)
+            </Text>
+            {adReason ? <Text style={styles.adButtonHint}>{adReason}</Text> : null}
+          </TouchableOpacity>
+        ) : null}
 
         {ENABLE_PREMIUM_UI ? (
           <TouchableOpacity style={styles.premiumButton} onPress={onGoPremium}>
             <Text style={styles.premiumButtonText}>✨ Hacete Premium · Ilimitado</Text>
-            <Text style={styles.premiumButtonHint}>USD 2.99 · pago único</Text>
+            <Text style={styles.premiumButtonHint}>USD 3.99 · pago único</Text>
           </TouchableOpacity>
         ) : (
           <Text style={styles.resetHint}>Volvé en {resetIn} para más búsquedas.</Text>

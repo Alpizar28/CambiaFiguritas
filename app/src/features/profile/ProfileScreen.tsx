@@ -32,6 +32,7 @@ import { ImportAlbumModal } from '../album/components/ImportAlbumModal';
 import { Tooltip } from '../../components/Tooltip';
 import { colors, spacing, radii } from '../../constants/theme';
 import { ENABLE_PREMIUM_UI } from '../../constants/featureFlags';
+import { CrownIcon } from '../../components/icons/CrownIcon';
 
 type LegalView = null | 'privacy' | 'terms';
 
@@ -170,7 +171,17 @@ export function ProfileScreen() {
             <Text style={styles.avatarLetter}>{user?.name?.[0] ?? '?'}</Text>
           </View>
         )}
-        <Text style={styles.name}>{user?.name ?? ''}</Text>
+        <View style={styles.nameRow}>
+          <Text
+            style={[
+              styles.name,
+              ENABLE_PREMIUM_UI && user?.premium && styles.namePremium,
+            ]}
+          >
+            {user?.name ?? ''}
+          </Text>
+          {ENABLE_PREMIUM_UI && user?.premium ? <CrownIcon size={22} /> : null}
+        </View>
         <Text style={styles.email}>{user?.email ?? ''}</Text>
         {ENABLE_PREMIUM_UI && user?.premium ? (
           <View style={styles.premiumPill}>
@@ -437,10 +448,18 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: '700',
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   name: {
     color: colors.text,
     fontSize: 22,
     fontWeight: '700',
+  },
+  namePremium: {
+    color: '#FFD700',
   },
   email: {
     color: colors.textMuted,

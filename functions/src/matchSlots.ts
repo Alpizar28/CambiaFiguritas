@@ -2,7 +2,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
-const FREE_CAP = 3;
+const FREE_CAP = 1;
 const AD_DAILY_CAP = 10;
 const AD_BASE_SECONDS = 15;
 const AD_INCREMENT_SECONDS = 5;

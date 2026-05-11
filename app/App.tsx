@@ -12,6 +12,7 @@ import { loadUserAlbum } from './src/services/albumSyncService';
 import { identify, track } from './src/services/analytics';
 import { initWebVitals } from './src/services/webVitals';
 import { initSentry } from './src/services/sentry';
+import { handlePaymentReturnFromUrl } from './src/services/paymentReturn';
 import { initPushNotifications } from './src/services/pushNotifications';
 import { useUserStore } from './src/store/userStore';
 import { useAlbumStore } from './src/store/albumStore';
@@ -27,6 +28,7 @@ import { OnboardingScreen } from './src/features/onboarding/OnboardingScreen';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { SyncIndicator } from './src/components/SyncIndicator';
 import { InstallPrompt } from './src/components/InstallPrompt';
+import { PaymentResultBanner } from './src/components/PaymentResultBanner';
 import { DemoBanner } from './src/features/demo/DemoBanner';
 import { buildDemoStatuses } from './src/features/demo/demoSampleData';
 import { colors } from './src/constants/theme';
@@ -38,6 +40,7 @@ function AppWithSync() {
       <AppNavigator />
       <SyncIndicator />
       <InstallPrompt />
+      <PaymentResultBanner />
     </>
   );
 }
@@ -68,6 +71,7 @@ export default function App() {
   useEffect(() => {
     initWebVitals();
     initSentry();
+    handlePaymentReturnFromUrl();
   }, []);
 
   useEffect(() => {
