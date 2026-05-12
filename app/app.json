@@ -16,10 +16,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cambiafiguritas.app",
-      "associatedDomains": [
-        "applinks:cambiafiguritas.online",
-        "applinks:cambiafiguritas.web.app"
-      ],
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para mostrarte usuarios cercanos con quienes intercambiar figuritas.",
         "NSCameraUsageDescription": "CambiaFiguritas usa la cámara para escanear códigos de figuritas. Las fotos no se guardan ni se envían."

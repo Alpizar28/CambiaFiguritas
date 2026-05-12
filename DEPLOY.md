@@ -118,10 +118,11 @@ npx ts-node scripts/migrate-fcm-tokens.ts             # actually move them
 The script writes a `migration-backup-<timestamp>.json` next to the working dir
 so the move is reversible.
 
-### 5. Host App Links / Universal Links verification files
+### 5. Host Android App Links verification file
 
-Without these, `autoVerify=true` in `app.json` won't pass and Android still
-prompts. The web layer needs them at known paths.
+Without `assetlinks.json`, `autoVerify=true` in `app.json` won't pass and Android
+still prompts the user to choose an app. The web layer needs the file at the
+known `.well-known/` path.
 
 Add into `app/web/.well-known/` (then re-run `npm run build:web` and redeploy
 hosting):
@@ -143,27 +144,10 @@ hosting):
   ]
   ```
 
-- `apple-app-site-association` — iOS Universal Links. Pattern:
-
-  ```json
-  {
-    "applinks": {
-      "apps": [],
-      "details": [
-        {
-          "appID": "<TEAM_ID>.com.cambiafiguritas.app",
-          "paths": ["*"]
-        }
-      ]
-    }
-  }
-  ```
-
 After deploy, verify:
 
 ```bash
 curl -sI https://cambiafiguritas.online/.well-known/assetlinks.json | head -3
-curl -sI https://cambiafiguritas.online/.well-known/apple-app-site-association | head -3
 ```
 
 ### 6. Out-of-band data audit
