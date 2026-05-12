@@ -20,15 +20,21 @@ const NOTIFY_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 const MAX_TARGETS_PER_TRIGGER = 5;
 
 /**
- * Lee el fcmToken desde la subcollection privada del usuario.
- * (Vive en `users/{uid}/private/notifications`; main doc ya no lo expone.)
+ * Lee el fcmToken. Prefiere la subcollection privada (path nuevo) y cae al main
+ * doc (path legacy) durante la transición F-DB-001. Borrar el fallback después
+ * de correr `functions/scripts/migrate-fcm-tokens.ts` y verificar que no quedan
+ * tokens en el main doc.
  */
 export async function readFcmToken(uid: string): Promise<string | null> {
   const db = getFirestore();
-  const snap = await db.doc(`users/${uid}/private/notifications`).get();
-  if (!snap.exists) return null;
-  const token = (snap.data() as { fcmToken?: string }).fcmToken;
-  return token ?? null;
+  const [privSnap, mainSnap] = await Promise.all([
+    db.doc(`users/${uid}/private/notifications`).get(),
+    db.doc(`users/${uid}`).get(),
+  ]);
+  const fromPriv = privSnap.exists ? (privSnap.data() as { fcmToken?: string }).fcmToken : null;
+  if (fromPriv) return fromPriv;
+  const fromMain = mainSnap.exists ? (mainSnap.data() as { fcmToken?: string }).fcmToken : null;
+  return fromMain ?? null;
 }
 
 /**
@@ -51,10 +57,17 @@ export async function sendPushSafe(
       e.code === 'messaging/invalid-registration-token' ||
       e.code === 'messaging/registration-token-not-registered'
     ) {
-      await db
-        .doc(`users/${targetUid}/private/notifications`)
-        .update({ fcmToken: FieldValue.delete() })
-        .catch(() => {});
+      // Borrar de ambos paths durante transición legacy.
+      await Promise.all([
+        db
+          .doc(`users/${targetUid}/private/notifications`)
+          .update({ fcmToken: FieldValue.delete() })
+          .catch(() => {}),
+        db
+          .doc(`users/${targetUid}`)
+          .update({ fcmToken: FieldValue.delete() })
+          .catch(() => {}),
+      ]);
     }
     return false;
   }

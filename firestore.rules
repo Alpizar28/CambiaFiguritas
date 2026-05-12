@@ -18,16 +18,19 @@ service cloud.firestore {
     // admin SDK los pueden tocar).
     match /users/{uid} {
       allow read: if isSignedIn();
+      // Create transitorio: aceptamos `email` y `fcmToken` aunque el cliente nuevo
+      // ya NO los manda. Cuando 100% del tráfico tenga el bundle nuevo y se haya
+      // corrido `functions/scripts/migrate-fcm-tokens.ts`, sacar el comentario y
+      // re-agregar los `!('email' in ...)` / `!('fcmToken' in ...)`. Ver DEPLOY.md.
       allow create: if isOwner(uid)
                     && request.resource.data.uid == uid
                     && request.resource.data.name is string
-                    && request.resource.data.name.size() <= 80
-                    // email ya no se persiste en este doc (vive solo en Firebase Auth y
-                    // se inyecta in-memory al dueño desde auth.currentUser).
-                    && !('email' in request.resource.data)
-                    && !('fcmToken' in request.resource.data);
+                    && request.resource.data.name.size() <= 80;
       // Update propio (dueño) con allow-list explícita de campos mutables. Cualquier campo
       // nuevo agregado al schema queda automáticamente inmutable hasta que se sume aquí.
+      // `email` y `fcmToken` están en la lista solo durante la transición F-DB-001:
+      // el bundle nuevo nunca los mutará, pero clientes con bundle viejo todavía intentan.
+      // Sacarlos cuando se confirme 0 tráfico legacy.
       allow update: if isOwner(uid)
                     && request.resource.data.uid == resource.data.uid
                     && request.resource.data.diff(resource.data).affectedKeys()
@@ -43,6 +46,10 @@ service cloud.firestore {
                            'shareable',
                            'lat',
                            'lng',
+                           'userTimezone',
+                           // transitionals — eliminar tras migración:
+                           'email',
+                           'fcmToken',
                          ]);
       allow delete: if isOwner(uid);
 

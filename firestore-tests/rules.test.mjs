@@ -292,19 +292,24 @@ describe('catch-all', () => {
 // =====================================================================
 
 describe('F-DB-001 — email/fcmToken removed from public users doc', () => {
-  test('create con email es rechazado (email vive solo en Firebase Auth)', async () => {
-    const alice = testEnv.authenticatedContext('alice').firestore();
-    await assertFails(
-      setDoc(doc(alice, 'users/alice'), { ...validUser('alice'), email: 'alice@x.com' }),
-    );
-  });
-
-  test('create con fcmToken en main doc es rechazado', async () => {
-    const alice = testEnv.authenticatedContext('alice').firestore();
-    await assertFails(
-      setDoc(doc(alice, 'users/alice'), { ...validUser('alice'), fcmToken: 'abc' }),
-    );
-  });
+  // Estos dos tests aplican post-migración. Durante la fase transitoria
+  // las rules todavía aceptan email/fcmToken en create para no romper clientes
+  // con bundle viejo. Cuando sacamos la transición (ver DEPLOY.md fase 3),
+  // descomentar y re-correr.
+  //
+  // test('create con email es rechazado (email vive solo en Firebase Auth)', async () => {
+  //   const alice = testEnv.authenticatedContext('alice').firestore();
+  //   await assertFails(
+  //     setDoc(doc(alice, 'users/alice'), { ...validUser('alice'), email: 'alice@x.com' }),
+  //   );
+  // });
+  //
+  // test('create con fcmToken en main doc es rechazado', async () => {
+  //   const alice = testEnv.authenticatedContext('alice').firestore();
+  //   await assertFails(
+  //     setDoc(doc(alice, 'users/alice'), { ...validUser('alice'), fcmToken: 'abc' }),
+  //   );
+  // });
 
   test('user NO puede leer private/notifications de otro user', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
@@ -371,13 +376,16 @@ describe('F-DB-003 — events lat/lng must be bucketed', () => {
 });
 
 describe('F-DB-004 — users update uses allow-list', () => {
-  test('owner NO puede mutar campo no listado (ej. fcmToken en main doc)', async () => {
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), 'users/alice'), validUser('alice'));
-    });
-    const alice = testEnv.authenticatedContext('alice').firestore();
-    await assertFails(updateDoc(doc(alice, 'users/alice'), { fcmToken: 'leaked' }));
-  });
+  // Durante transición F-DB-001 `fcmToken` está en el allow-list para no romper
+  // clientes con bundle viejo. Tras finalizar la migración (DEPLOY.md fase 3),
+  // sacar `fcmToken` del allow-list y descomentar este test.
+  // test('owner NO puede mutar campo no listado (ej. fcmToken en main doc)', async () => {
+  //   await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  //     await setDoc(doc(ctx.firestore(), 'users/alice'), validUser('alice'));
+  //   });
+  //   const alice = testEnv.authenticatedContext('alice').firestore();
+  //   await assertFails(updateDoc(doc(alice, 'users/alice'), { fcmToken: 'leaked' }));
+  // });
 
   test('owner NO puede mutar campo nuevo no listado (regresión-proof)', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {

@@ -82,20 +82,39 @@ export const dailyDigest = onSchedule(
       return;
     }
 
-    // fcmToken vive en users/{uid}/private/notifications — usar collectionGroup.
-    const privateSnap = await db
-      .collectionGroup('private')
-      .where('fcmToken', '!=', null)
-      .limit(MAX_USERS_PER_RUN)
-      .get();
+    // fcmToken vive en users/{uid}/private/notifications (path nuevo).
+    // Durante la transición legacy también escaneamos main docs (`users` con
+    // `fcmToken`) y de-duplicamos por uid. Quitar el segundo scan después de la
+    // migración (ver functions/scripts/migrate-fcm-tokens.ts).
+    const [privateSnap, legacySnap] = await Promise.all([
+      db
+        .collectionGroup('private')
+        .where('fcmToken', '!=', null)
+        .limit(MAX_USERS_PER_RUN)
+        .get(),
+      db
+        .collection('users')
+        .where('fcmToken', '!=', null)
+        .limit(MAX_USERS_PER_RUN)
+        .get(),
+    ]);
 
-    let sentCount = 0;
+    const candidates = new Map<string, string>();
     for (const privDoc of privateSnap.docs) {
-      // Path: users/{uid}/private/notifications  →  parent.parent.id es uid
       const uid = privDoc.ref.parent.parent?.id;
       if (!uid) continue;
       const fcmToken = (privDoc.data() as { fcmToken?: string }).fcmToken;
-      if (!fcmToken) continue;
+      if (fcmToken && !candidates.has(uid)) candidates.set(uid, fcmToken);
+    }
+    for (const legacyDoc of legacySnap.docs) {
+      const uid = legacyDoc.id;
+      if (candidates.has(uid)) continue; // prefer new path
+      const fcmToken = (legacyDoc.data() as { fcmToken?: string }).fcmToken;
+      if (fcmToken) candidates.set(uid, fcmToken);
+    }
+
+    let sentCount = 0;
+    for (const [uid, fcmToken] of candidates) {
       const userSnap = await db.doc(`users/${uid}`).get();
       if (!userSnap.exists) continue;
       const user = userSnap.data() as UserDoc;
@@ -136,6 +155,6 @@ export const dailyDigest = onSchedule(
       if (ok) sentCount += 1;
     }
 
-    logger.info(`[digest] sent=${sentCount} candidates=${candidateRepes.length} users_scanned=${privateSnap.size}`);
+    logger.info(`[digest] sent=${sentCount} candidates=${candidateRepes.length} users_scanned=${candidates.size}`);
   },
 );

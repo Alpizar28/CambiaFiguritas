@@ -45,10 +45,15 @@ export async function grantPremium(
 
   logger.info(`[entitlement] granted premium via ${source} for ${uid}`);
 
-  // Thank-you push (best effort).
+  // Thank-you push (best effort). Lee de ambos paths durante transición legacy.
   try {
-    const privSnap = await db.doc(`users/${uid}/private/notifications`).get();
-    const fcmToken = (privSnap.data() as { fcmToken?: string } | undefined)?.fcmToken;
+    const [privSnap, mainSnap] = await Promise.all([
+      db.doc(`users/${uid}/private/notifications`).get(),
+      db.doc(`users/${uid}`).get(),
+    ]);
+    const fcmToken =
+      (privSnap.data() as { fcmToken?: string } | undefined)?.fcmToken ||
+      (mainSnap.data() as { fcmToken?: string } | undefined)?.fcmToken;
     if (fcmToken) {
       await sendPushSafe(uid, fcmToken, {
         notification: {
