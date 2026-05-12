@@ -4,10 +4,12 @@ import { functions } from './firebase';
 import { track } from './analytics';
 
 const PRODUCT_ID = 'cf_premium_lifetime';
-const PACKAGE_NAME = 'com.cambiafiguritas.app';
 
+// Server now pins productId and packageName itself (see functions/src/playBilling.ts).
+// Client only sends the purchase token; sending productId/packageName from a hostile
+// client would otherwise let an attacker substitute any cheap Play purchase for Premium.
 const verifyPlayPurchaseFn = httpsCallable<
-  { purchaseToken: string; productId: string; packageName: string },
+  { purchaseToken: string },
   { granted: boolean }
 >(functions, 'verifyPlayPurchase');
 
@@ -53,11 +55,7 @@ export async function purchasePremium(): Promise<{ success: boolean }> {
           reject(new Error('no_purchase_token'));
           return;
         }
-        const result = await verifyPlayPurchaseFn({
-          purchaseToken,
-          productId: PRODUCT_ID,
-          packageName: PACKAGE_NAME,
-        });
+        const result = await verifyPlayPurchaseFn({ purchaseToken });
         if (result.data.granted) {
           await RNIap.finishTransaction({ purchase, isConsumable: false });
           track({ name: 'premium_purchase_completed' });

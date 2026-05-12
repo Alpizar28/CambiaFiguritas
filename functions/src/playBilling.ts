@@ -6,10 +6,15 @@ import { grantPremium } from './payments/entitlement';
 
 const PLAY_SERVICE_ACCOUNT_JSON = defineSecret('PLAY_SERVICE_ACCOUNT_JSON');
 
+// Server constants. Trusting the client to declare which product was purchased lets an
+// attacker substitute any cheap Play purchase token for a Premium grant (purchase
+// substitution). The server pins both values and verifies that Google echoes back the
+// expected product id.
+const ALLOWED_PACKAGE_NAME = 'com.cambiafiguritas.app';
+const PREMIUM_PRODUCT_ID = 'cf_premium_lifetime';
+
 type Payload = {
   purchaseToken: string;
-  productId: string;
-  packageName: string;
 };
 
 /**
@@ -33,10 +38,12 @@ export const verifyPlayPurchase = onCall<Payload>(
     const uid = req.auth?.uid;
     if (!uid) throw new HttpsError('unauthenticated', 'auth required');
 
-    const { purchaseToken, productId, packageName } = req.data;
-    if (!purchaseToken || !productId || !packageName) {
-      throw new HttpsError('invalid-argument', 'missing fields');
+    const { purchaseToken } = req.data;
+    if (!purchaseToken) {
+      throw new HttpsError('invalid-argument', 'purchaseToken required');
     }
+    const productId = PREMIUM_PRODUCT_ID;
+    const packageName = ALLOWED_PACKAGE_NAME;
 
     const saJson = PLAY_SERVICE_ACCOUNT_JSON.value();
     if (!saJson) {

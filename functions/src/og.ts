@@ -19,6 +19,7 @@ type UserDoc = {
   privacyHideRepeated?: boolean;
   privacyAnonymous?: boolean;
   premium?: boolean;
+  shareable?: boolean;
 };
 
 function escapeXml(s: string): string {
@@ -80,6 +81,9 @@ async function loadShareData(uid: string): Promise<ShareData | null> {
   ]);
   if (!userSnap.exists) return null;
   const user = userSnap.data() as UserDoc;
+  // Solo renderizamos contenido user-specific si el usuario opto in al feature de
+  // compartir. Sin shareable=true, el endpoint sirve la página/imagen genérica.
+  if (user.shareable !== true) return null;
   const album = albumSnap.exists ? (albumSnap.data() as AlbumDoc) : {};
 
   const anonymous = user.privacyAnonymous === true;

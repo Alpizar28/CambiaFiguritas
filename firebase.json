@@ -60,7 +60,8 @@
           { "key": "X-Content-Type-Options", "value": "nosniff" },
           { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
           { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-          { "key": "Permissions-Policy", "value": "camera=(), microphone=(), payment=()" }
+          { "key": "Permissions-Policy", "value": "camera=(self), microphone=(), payment=(), geolocation=(self), accelerometer=(), gyroscope=()" },
+          { "key": "Content-Security-Policy-Report-Only", "value": "default-src 'self'; script-src 'self' https://www.gstatic.com https://*.googleapis.com 'unsafe-inline'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://us-central1-cambiafiguritas.cloudfunctions.net https://*.ingest.sentry.io https://*.ingest.us.sentry.io; img-src 'self' https: data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; base-uri 'self'; frame-ancestors 'self'; form-action 'self'; object-src 'none'" }
         ]
       },
       {

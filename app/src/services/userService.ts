@@ -26,15 +26,17 @@ export async function getOrCreateUser(
     if (!existing.userTimezone && tz) {
       // Backfill timezone para users previos.
       await updateDoc(ref, { userTimezone: tz }).catch(() => {});
-      return { ...existing, userTimezone: tz };
+      return { ...existing, userTimezone: tz, email };
     }
-    return existing;
+    return { ...existing, email };
   }
 
-  const persisted: AppUser = {
+  // `email` no se persiste en `users/{uid}` (es lectura abierta a todos los autenticados).
+  // Email vive en Firebase Auth para el dueño y se obtiene desde auth.currentUser en runtime.
+  // Solo se devuelve in-memory en el AppUser del dueño.
+  const persisted = {
     uid,
     name,
-    email,
     photoUrl,
     city: '',
     premium: false,
@@ -43,16 +45,18 @@ export async function getOrCreateUser(
   };
 
   await setDoc(ref, persisted);
-  return persisted;
+  return { ...persisted, email } as AppUser;
 }
 
 /**
  * Suscripción live al user doc. Permite que premium=true escrito por webhook
- * propague a todos los clientes en segundos.
+ * propague a todos los clientes en segundos. `email` se inyecta in-memory desde
+ * el caller (auth.currentUser); no vive en Firestore.
  */
 export function subscribeUserDoc(
   uid: string,
   callback: (user: AppUser | null) => void,
+  emailFromAuth?: string,
 ): Unsubscribe {
   const ref = doc(db, 'users', uid);
   return onSnapshot(
@@ -62,7 +66,8 @@ export function subscribeUserDoc(
         callback(null);
         return;
       }
-      callback(snap.data() as AppUser);
+      const data = snap.data() as AppUser;
+      callback(emailFromAuth ? { ...data, email: emailFromAuth } : data);
     },
     (err) => {
       console.warn('[userService] subscribeUserDoc error', err);

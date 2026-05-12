@@ -47,8 +47,8 @@ export async function grantPremium(
 
   // Thank-you push (best effort).
   try {
-    const userSnap = await userRef.get();
-    const fcmToken = (userSnap.data() as { fcmToken?: string } | undefined)?.fcmToken;
+    const privSnap = await db.doc(`users/${uid}/private/notifications`).get();
+    const fcmToken = (privSnap.data() as { fcmToken?: string } | undefined)?.fcmToken;
     if (fcmToken) {
       await sendPushSafe(uid, fcmToken, {
         notification: {

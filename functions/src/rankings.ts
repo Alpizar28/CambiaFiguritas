@@ -131,9 +131,16 @@ export const aggregateRankings = onSchedule(
   },
 );
 
+// On-demand refresh would otherwise be a read-amplification DoS vector: each call reads
+// every userAlbums doc + up to 200 user docs. We honour the most recent scheduled run
+// when it is fresh enough; only fall through to a real recomputation if the cache is
+// staler than this window.
+const REFRESH_CACHE_WINDOW_MS = 10 * 60 * 1000;
+
 /**
- * On-demand: re-agrega ahora. Útil para testing inicial o si user reporta que no aparece.
- * Auth requerida (no exponer publicamente).
+ * On-demand: re-agrega ahora si la última corrida quedó vieja. Si no, devuelve el
+ * resultado cacheado. Esto evita que un usuario invocando la callable repetidamente
+ * agote la quota de lectura.
  */
 export const refreshRankingsOnDemand = onCall(
   { region: 'us-central1' },
@@ -141,7 +148,18 @@ export const refreshRankingsOnDemand = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Auth requerida.');
     }
+    const db = getFirestore();
+    const globalRef = db.doc('rankings/global');
+    const globalSnap = await globalRef.get();
+    if (globalSnap.exists) {
+      const data = globalSnap.data() as { updatedAt?: FirebaseFirestore.Timestamp };
+      const updatedAt = data.updatedAt?.toMillis?.() ?? 0;
+      if (Date.now() - updatedAt < REFRESH_CACHE_WINDOW_MS) {
+        logger.info('[rankings] refresh skipped — cache fresh');
+        return { global: 0, cities: 0, cached: true };
+      }
+    }
     const result = await aggregate();
-    return result;
+    return { ...result, cached: false };
   },
 );

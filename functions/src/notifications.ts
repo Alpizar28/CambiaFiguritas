@@ -12,13 +12,24 @@ type AlbumDoc = {
 type UserDoc = {
   uid?: string;
   name?: string;
-  fcmToken?: string;
   notifyOnMatch?: boolean;
   lastNotifiedAt?: number;
 };
 
 const NOTIFY_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 const MAX_TARGETS_PER_TRIGGER = 5;
+
+/**
+ * Lee el fcmToken desde la subcollection privada del usuario.
+ * (Vive en `users/{uid}/private/notifications`; main doc ya no lo expone.)
+ */
+export async function readFcmToken(uid: string): Promise<string | null> {
+  const db = getFirestore();
+  const snap = await db.doc(`users/${uid}/private/notifications`).get();
+  if (!snap.exists) return null;
+  const token = (snap.data() as { fcmToken?: string }).fcmToken;
+  return token ?? null;
+}
 
 /**
  * Envía push y limpia token inválido. Devuelve true si efectivamente envió.
@@ -40,7 +51,10 @@ export async function sendPushSafe(
       e.code === 'messaging/invalid-registration-token' ||
       e.code === 'messaging/registration-token-not-registered'
     ) {
-      await db.doc(`users/${targetUid}`).update({ fcmToken: FieldValue.delete() });
+      await db
+        .doc(`users/${targetUid}/private/notifications`)
+        .update({ fcmToken: FieldValue.delete() })
+        .catch(() => {});
     }
     return false;
   }
@@ -135,16 +149,17 @@ export const onAlbumUpdateNotify = onDocumentWritten(
       const userSnap = await db.doc(`users/${candidate.uid}`).get();
       if (!userSnap.exists) continue;
       const user = userSnap.data() as UserDoc;
-      if (!user.fcmToken) continue;
       if (user.notifyOnMatch === false) continue;
       if (user.lastNotifiedAt && now - user.lastNotifiedAt < NOTIFY_COOLDOWN_MS) continue;
+      const fcmToken = await readFcmToken(candidate.uid);
+      if (!fcmToken) continue;
 
       const matchCountText = candidate.matchedRepes.length === 1
         ? '1 figurita'
         : `${candidate.matchedRepes.length} figuritas`;
 
       sends.push(
-        sendPushSafe(candidate.uid, user.fcmToken, {
+        sendPushSafe(candidate.uid, fcmToken, {
           notification: {
             title: '¡Nuevo match en tu wishlist!',
             body: `${sourceName} subió ${matchCountText} que estás buscando.`,

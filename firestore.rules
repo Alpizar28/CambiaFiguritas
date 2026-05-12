@@ -12,36 +12,54 @@ service cloud.firestore {
     }
 
     // users: perfil público de cada usuario (necesario para mostrar matches y eventos).
-    // Solo el dueño puede crear/editar su documento (excepto reputación que puede
-    // actualizar cualquier usuario autenticado vía recordReputationVote).
+    // Solo contiene campos PUBLIC-SAFE. Campos sensibles (email, fcmToken, etc.) viven
+    // en `users/{uid}/private/...` y solo el dueño puede leerlos.
+    // Reputación, premium y billing son inmutables client-side (solo Cloud Functions con
+    // admin SDK los pueden tocar).
     match /users/{uid} {
       allow read: if isSignedIn();
       allow create: if isOwner(uid)
                     && request.resource.data.uid == uid
-                    && request.resource.data.email is string
                     && request.resource.data.name is string
                     && request.resource.data.name.size() <= 80
-                    && request.resource.data.email.size() <= 200;
-      // Update propio (dueño). Reputación, premium y billing son inmutables
-      // client-side (solo Cloud Functions con admin SDK los pueden tocar).
-      // Las inmutabilidades usan la forma `affectedKeys().hasAny([...])` para
-      // evitar falsos negativos cuando el campo no existe en el doc actual
-      // (Firestore rules tratan campos faltantes de forma especial al comparar).
+                    // email ya no se persiste en este doc (vive solo en Firebase Auth y
+                    // se inyecta in-memory al dueño desde auth.currentUser).
+                    && !('email' in request.resource.data)
+                    && !('fcmToken' in request.resource.data);
+      // Update propio (dueño) con allow-list explícita de campos mutables. Cualquier campo
+      // nuevo agregado al schema queda automáticamente inmutable hasta que se sume aquí.
       allow update: if isOwner(uid)
                     && request.resource.data.uid == resource.data.uid
-                    && !request.resource.data.diff(resource.data).affectedKeys()
-                         .hasAny([
-                           'email',
-                           'createdAt',
-                           'reputationUp',
-                           'reputationDown',
-                           'reputationCount',
-                           'premium',
-                           'adsWatchedToday',
-                           'adsWatchedDate',
-                           'lastAdUnlockAt',
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly([
+                           'name',
+                           'city',
+                           'photoUrl',
+                           'whatsapp',
+                           'notifyOnMatch',
+                           'privacyHideProgress',
+                           'privacyHideRepeated',
+                           'privacyAnonymous',
+                           'shareable',
+                           'lat',
+                           'lng',
                          ]);
       allow delete: if isOwner(uid);
+
+      // Subcollection: campos sensibles (fcmToken, etc). Owner-only read; backend-only write
+      // (las Cloud Functions escriben directo desde admin SDK que bypassea rules, y el cliente
+      // necesita poder escribir su propio fcmToken — lo permitimos con shape estricto).
+      match /private/{docId} {
+        allow read: if isOwner(uid);
+        // Permitir al dueño escribir solo `fcmToken` (registro de push) y el timestamp.
+        allow write: if isOwner(uid)
+                     && request.resource.data.keys().hasOnly(['fcmToken', 'updatedAt'])
+                     && (
+                       !('fcmToken' in request.resource.data) ||
+                       (request.resource.data.fcmToken is string &&
+                        request.resource.data.fcmToken.size() <= 4096)
+                     );
+      }
 
       // Subcollection: votos de reputación.
       // Cliente NO escribe acá. Solo Cloud Function admin puede.
@@ -97,6 +115,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // processedWebhooks: dedupe store for inbound webhooks (TiloPay etc.).
+    // Backend-only. No client access at all.
+    match /processedWebhooks/{key} {
+      allow read, write: if false;
+    }
+
     // userAlbums: estado del album por usuario. Lectura abierta a usuarios autenticados
     // (la usa findMatches para iterar sobre todos los albums). Escritura solo del dueño.
     match /userAlbums/{uid} {
@@ -107,6 +131,8 @@ service cloud.firestore {
     // events: eventos públicos creados por usuarios.
     // Lectura abierta. Crear requiere auth y createdBy == uid del usuario.
     // Solo el creador puede editar/borrar.
+    // Lat/lng deben estar bucketeados a 0.05° (~5km) — el cliente ya lo hace, pero la regla
+    // lo refuerza rechazando coords con más de 2 decimales no-cero.
     match /events/{eventId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn()
@@ -118,6 +144,9 @@ service cloud.firestore {
                     && request.resource.data.lng is number
                     && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
                     && request.resource.data.lng >= -180 && request.resource.data.lng <= 180
+                    // Bucketing check: lat * 20 debe ser entero (0.05° steps).
+                    && (request.resource.data.lat * 20) is int
+                    && (request.resource.data.lng * 20) is int
                     && request.resource.data.date is string
                     && request.resource.data.type in ['intercambio', 'meetup', 'tienda']
                     && request.resource.data.cityName is string

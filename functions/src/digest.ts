@@ -13,7 +13,6 @@ type AlbumDoc = {
 type UserDoc = {
   uid?: string;
   name?: string;
-  fcmToken?: string;
   notifyOnMatch?: boolean;
   lastNotifiedAt?: number;
 };
@@ -83,18 +82,23 @@ export const dailyDigest = onSchedule(
       return;
     }
 
-    // Users con fcmToken y notifyOnMatch !== false.
-    const usersSnap = await db
-      .collection('users')
+    // fcmToken vive en users/{uid}/private/notifications — usar collectionGroup.
+    const privateSnap = await db
+      .collectionGroup('private')
       .where('fcmToken', '!=', null)
       .limit(MAX_USERS_PER_RUN)
       .get();
 
     let sentCount = 0;
-    for (const userDocSnap of usersSnap.docs) {
-      const user = userDocSnap.data() as UserDoc;
-      const uid = userDocSnap.id;
-      if (!user.fcmToken) continue;
+    for (const privDoc of privateSnap.docs) {
+      // Path: users/{uid}/private/notifications  →  parent.parent.id es uid
+      const uid = privDoc.ref.parent.parent?.id;
+      if (!uid) continue;
+      const fcmToken = (privDoc.data() as { fcmToken?: string }).fcmToken;
+      if (!fcmToken) continue;
+      const userSnap = await db.doc(`users/${uid}`).get();
+      if (!userSnap.exists) continue;
+      const user = userSnap.data() as UserDoc;
       if (user.notifyOnMatch === false) continue;
       if (user.lastNotifiedAt && now - user.lastNotifiedAt < COOLDOWN_MS) continue;
 
@@ -121,7 +125,7 @@ export const dailyDigest = onSchedule(
         ? '1 coincidencia nueva hoy'
         : `${matchCount} coincidencias nuevas hoy`;
 
-      const ok = await sendPushSafe(uid, user.fcmToken, {
+      const ok = await sendPushSafe(uid, fcmToken, {
         notification: { title: 'Tu resumen diario 🎯', body },
         webpush: {
           fcmOptions: { link: 'https://cambiafiguritas.online/' },
@@ -132,6 +136,6 @@ export const dailyDigest = onSchedule(
       if (ok) sentCount += 1;
     }
 
-    logger.info(`[digest] sent=${sentCount} candidates=${candidateRepes.length} users_scanned=${usersSnap.size}`);
+    logger.info(`[digest] sent=${sentCount} candidates=${candidateRepes.length} users_scanned=${privateSnap.size}`);
   },
 );

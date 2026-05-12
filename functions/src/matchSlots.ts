@@ -41,6 +41,10 @@ function nextResetAt(timezone: string | undefined): number {
 /**
  * Reservar slot de matches del día. Idempotente por user+día.
  * Premium → ok=true sin incremento.
+ *
+ * Day key se computa server-side desde `user.userTimezone` (persistido en signup) o
+ * el fallback. El `tz` que envía el cliente se considera solo en signup; un usuario
+ * rotando timezones no puede crear `matchSlots/{otherDay}` docs para esquivar la cap.
  */
 export const consumeMatchSlot = onCall<{ tz?: string }>(
   { region: 'us-central1' },
@@ -55,7 +59,9 @@ export const consumeMatchSlot = onCall<{ tz?: string }>(
     const userSnap = await tx.get(userRef);
     if (!userSnap.exists) throw new HttpsError('not-found', 'user');
     const user = userSnap.data() as UserDoc;
-    const tz = user.userTimezone || req.data?.tz || TZ_FALLBACK;
+    // Usar SIEMPRE el tz persistido en el user doc. Si no existe, fallback. Ignorar el
+    // tz que el cliente envía en este call salvo para hidratar el doc (ver más abajo).
+    const tz = user.userTimezone || TZ_FALLBACK;
     const day = dayKey(tz);
     const resetAt = nextResetAt(tz);
 
@@ -119,7 +125,8 @@ export const unlockMatchSlot = onCall<{ tz?: string }>(
     const userSnap = await tx.get(userRef);
     if (!userSnap.exists) throw new HttpsError('not-found', 'user');
     const user = userSnap.data() as UserDoc;
-    const tz = user.userTimezone || req.data?.tz || TZ_FALLBACK;
+    // Ver consumeMatchSlot: ignorar tz del request para el cálculo del día.
+    const tz = user.userTimezone || TZ_FALLBACK;
     const day = dayKey(tz);
 
     if (user.premium === true) {

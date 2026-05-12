@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { getApps, getApp } from 'firebase/app';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 import { db } from './firebase';
 
 // VAPID key pública. Generar en Firebase Console → Settings → Cloud Messaging → Web Push certificates.
@@ -51,8 +51,14 @@ export async function initPushNotifications(uid: string | null): Promise<void> {
       return;
     }
 
-    // Guardar token en users/{uid}.fcmToken para que la Cloud Function pueda enviar push.
-    await updateDoc(doc(db, 'users', uid), { fcmToken: token });
+    // El FCM token es sensible (permite push targeted). Vive en una subcollection privada
+    // legible solo por el dueño; las Cloud Functions lo leen vía admin SDK que bypassea rules.
+    const { setDoc, serverTimestamp } = await import('firebase/firestore');
+    await setDoc(
+      doc(db, `users/${uid}/private/notifications`),
+      { fcmToken: token, updatedAt: serverTimestamp() },
+      { merge: true },
+    );
     if (__DEV__) console.log('[push] token registrado');
 
     // Foreground messages: mostrar manualmente (FCM no las muestra cuando tab activa).

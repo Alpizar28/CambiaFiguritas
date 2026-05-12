@@ -84,11 +84,15 @@ export default function App() {
   // se propaga a la UI sin reload.
   useEffect(() => {
     if (!user?.uid) return;
-    const unsub = subscribeUserDoc(user.uid, (updated) => {
-      if (updated) setUser(updated);
-    });
+    const unsub = subscribeUserDoc(
+      user.uid,
+      (updated) => {
+        if (updated) setUser(updated);
+      },
+      user.email,
+    );
     return unsub;
-  }, [user?.uid, setUser]);
+  }, [user?.uid, user?.email, setUser]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
