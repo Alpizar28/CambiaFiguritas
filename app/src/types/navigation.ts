@@ -18,4 +18,6 @@ export type TradeStackParamList = {
   TradeSelect: { sessionId: string; role: 'host' | 'guest' };
   TradeReview: { sessionId: string; role: 'host' | 'guest' };
   TradeComplete: { sessionId: string };
+  TradeShare: undefined;
+  TradeGuestWeb: { token: string };
 };

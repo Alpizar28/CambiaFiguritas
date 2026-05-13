@@ -3,7 +3,9 @@ import type { TradeRole, TradeSession } from '../features/trade/types';
 
 type TradeModalIntent =
   | { kind: 'home' }
-  | { kind: 'join'; prefilledCode?: string };
+  | { kind: 'join'; prefilledCode?: string }
+  | { kind: 'share' }
+  | { kind: 'guest_web'; token: string };
 
 type TradeStore = {
   activeSessionId: string | null;

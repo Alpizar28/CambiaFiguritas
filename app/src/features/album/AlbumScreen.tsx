@@ -31,7 +31,9 @@ import { useUserStore } from '../../store/userStore';
 import { ShareCardModal } from '../profile/components/ShareCardModal';
 import { ImportAlbumModal } from './components/ImportAlbumModal';
 import { ScanFab } from '../../components/ScanFab';
+import { TradeFab } from '../../components/TradeFab';
 import { ScanScreen } from '../scan/ScanScreen';
+import { useTradeStore } from '../../store/tradeStore';
 import type { AlbumSlot, CountryAlbumPage, Sticker, StickerStatus } from './types';
 import { fuzzyContains } from './utils/fuzzyMatch';
 
@@ -125,6 +127,7 @@ export function AlbumScreen() {
   const insets = useSafeAreaInsets();
   const isDesktop = width >= 900;
   const uid = useUserStore((s) => s.user?.uid);
+  const openTradeModal = useTradeStore((s) => s.openModal);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
@@ -776,6 +779,7 @@ export function AlbumScreen() {
       {/* ScanFab oculto temporalmente */}
       <ScanScreen visible={scanOpen} onClose={() => setScanOpen(false)} />
       <ImportAlbumModal visible={importModalOpen} onClose={() => setImportModalOpen(false)} source="album" />
+      <TradeFab onPress={() => openTradeModal({ kind: 'home' })} />
       </View>
     );
   }
@@ -958,6 +962,7 @@ export function AlbumScreen() {
       <ImportAlbumModal visible={importModalOpen} onClose={() => setImportModalOpen(false)} source="album" />
       {/* ScanFab oculto temporalmente */}
       <ScanScreen visible={scanOpen} onClose={() => setScanOpen(false)} />
+      <TradeFab onPress={() => openTradeModal({ kind: 'home' })} />
       <StickerActionSheet
         visible={!!sheetSticker}
         sticker={sheetSticker}

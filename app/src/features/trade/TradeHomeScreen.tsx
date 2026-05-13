@@ -58,6 +58,14 @@ export function TradeHomeScreen() {
     navigation.navigate('TradeJoin', {});
   }, [user, demoMode, navigation]);
 
+  const handleShareLink = useCallback(() => {
+    if (!user || demoMode) {
+      Alert.alert('Iniciá sesión', 'Necesitás una cuenta para generar un link de intercambio.');
+      return;
+    }
+    navigation.navigate('TradeShare');
+  }, [user, demoMode, navigation]);
+
   const handleScan = useCallback(() => {
     if (!user || demoMode) {
       Alert.alert('Iniciá sesión', 'Necesitás una cuenta para usar intercambio presencial.');
@@ -96,12 +104,25 @@ export function TradeHomeScreen() {
       </View>
 
       <ScreenShell
-        eyebrow="Intercambio presencial"
-        title="Cambiá figus en persona"
-        description="Pareá tu app con la del otro coleccionista, marcá las figus que se dan y confirmá juntos. Tu álbum se actualiza solo."
+        eyebrow="Intercambio"
+        title="Cambiá figus con cualquiera"
+        description="Con otro usuario de la app o con alguien que ni la conoce. Elegí cómo querés intercambiar."
       />
 
       <View style={styles.actions}>
+        <Pressable
+          onPress={handleShareLink}
+          style={({ pressed }) => [styles.cta, styles.ctaShare, pressed && styles.pressed]}
+        >
+          <View style={styles.badgeRow}>
+            <Text style={styles.badge}>NUEVO</Text>
+          </View>
+          <Text style={styles.ctaTitleShare}>Intercambiar por link</Text>
+          <Text style={styles.ctaSubShare}>
+            Para alguien que NO usa la app. Mandás un link por WhatsApp, pega su lista y listo.
+          </Text>
+        </Pressable>
+
         <Pressable
           onPress={handleCreate}
           disabled={busy}
@@ -111,8 +132,8 @@ export function TradeHomeScreen() {
             <ActivityIndicator color="#001A0A" />
           ) : (
             <>
-              <Text style={styles.ctaTitle}>Iniciar intercambio</Text>
-              <Text style={styles.ctaSub}>Generá un QR para que otro escanee.</Text>
+              <Text style={styles.ctaTitle}>Intercambio presencial (QR)</Text>
+              <Text style={styles.ctaSub}>Pareá con otro usuario de la app, cara a cara.</Text>
             </>
           )}
         </Pressable>
@@ -135,11 +156,11 @@ export function TradeHomeScreen() {
       </View>
 
       <View style={styles.howWrap}>
-        <Text style={styles.howTitle}>Cómo funciona</Text>
-        <Text style={styles.howStep}>1. Uno crea la sesión y muestra el QR.</Text>
-        <Text style={styles.howStep}>2. El otro escanea el QR o tipea el código.</Text>
-        <Text style={styles.howStep}>3. Cada uno marca qué figu da y qué recibe.</Text>
-        <Text style={styles.howStep}>4. Confirman los dos. Listo, ambos álbumes se actualizan.</Text>
+        <Text style={styles.howTitle}>Cómo funciona el link</Text>
+        <Text style={styles.howStep}>1. Generás un link con tu lista (repetidas + faltantes).</Text>
+        <Text style={styles.howStep}>2. Se lo mandás a la otra persona por WhatsApp.</Text>
+        <Text style={styles.howStep}>3. Abre el link sin instalar nada, pega su lista.</Text>
+        <Text style={styles.howStep}>4. Te llega aviso, confirmás y tu álbum se actualiza.</Text>
       </View>
 
       {scannerOpen ? (
@@ -189,6 +210,39 @@ const styles = StyleSheet.create({
   ctaSecondary: {
     backgroundColor: colors.card,
     borderColor: colors.border,
+  },
+  ctaShare: {
+    backgroundColor: colors.surface,
+    borderColor: colors.accent,
+    borderWidth: 2,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  badge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.accent,
+    color: '#001A0A',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  ctaTitleShare: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  ctaSubShare: {
+    color: colors.textMuted,
+    marginTop: 4,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
   },
   pressed: {
     opacity: 0.85,

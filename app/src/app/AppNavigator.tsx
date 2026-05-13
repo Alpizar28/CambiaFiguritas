@@ -71,6 +71,8 @@ const linking: LinkingOptions<RootTabParamList> = {
       if (pathMatch) return `cambiafiguritas://u/${pathMatch[1]}`;
       const tradeMatch = window.location.pathname.match(/^\/trade\/([A-Z0-9]{6})$/i);
       if (tradeMatch) return `cambiafiguritas://trade/${tradeMatch[1]}`;
+      const guestLinkMatch = window.location.pathname.match(/^\/x\/([A-Za-z0-9_-]{10,24})$/);
+      if (guestLinkMatch) return `cambiafiguritas://x/${guestLinkMatch[1]}`;
       return null;
     }
     return (await Linking.getInitialURL()) ?? null;
@@ -86,6 +88,11 @@ export function AppNavigator() {
 
   const handleDeepLink = (url: string | null) => {
     if (!url) return;
+    const guestLinkMatch = url.match(/\/x\/([A-Za-z0-9_-]{10,24})/);
+    if (guestLinkMatch?.[1]) {
+      openTradeModal({ kind: 'guest_web', token: guestLinkMatch[1] });
+      return;
+    }
     const tradeMatch = url.match(/\/trade\/([A-Z0-9]{6})/i);
     if (tradeMatch?.[1]) {
       openTradeModal({ kind: 'join', prefilledCode: tradeMatch[1].toUpperCase() });
@@ -197,11 +204,21 @@ export function AppNavigator() {
             <NavigationIndependentTree>
               <NavigationContainer theme={navigationTheme}>
                 <TradeNavigator
-                  initialRoute={tradeIntent.kind === 'join' ? 'TradeJoin' : 'TradeHome'}
+                  initialRoute={
+                    tradeIntent.kind === 'join'
+                      ? 'TradeJoin'
+                      : tradeIntent.kind === 'share'
+                        ? 'TradeShare'
+                        : tradeIntent.kind === 'guest_web'
+                          ? 'TradeGuestWeb'
+                          : 'TradeHome'
+                  }
                   initialParams={
                     tradeIntent.kind === 'join'
                       ? ({ prefilledCode: tradeIntent.prefilledCode } as TradeStackParamList['TradeJoin'])
-                      : undefined
+                      : tradeIntent.kind === 'guest_web'
+                        ? ({ token: tradeIntent.token } as TradeStackParamList['TradeGuestWeb'])
+                        : undefined
                   }
                 />
               </NavigationContainer>

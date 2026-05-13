@@ -287,6 +287,72 @@ describe('catch-all', () => {
   });
 });
 
+describe('guestTradeSessions — backend-only access', () => {
+  test('cliente autenticado NO puede leer guestTradeSessions', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'guestTradeSessions/abc123XYZ_'), {
+        token: 'abc123XYZ_',
+        hostUid: 'alice',
+        status: 'waiting_guest',
+      });
+    });
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await assertFails(getDoc(doc(alice, 'guestTradeSessions/abc123XYZ_')));
+  });
+
+  test('cliente autenticado NO puede crear guestTradeSessions directamente', async () => {
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await assertFails(
+      setDoc(doc(alice, 'guestTradeSessions/abc123XYZ_'), {
+        token: 'abc123XYZ_',
+        hostUid: 'alice',
+        status: 'waiting_guest',
+      }),
+    );
+  });
+
+  test('host NO puede leer aunque sea owner — todo va por Cloud Function', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'guestTradeSessions/tok1234abcd'), {
+        token: 'tok1234abcd',
+        hostUid: 'alice',
+        status: 'waiting_guest',
+      });
+    });
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await assertFails(getDoc(doc(alice, 'guestTradeSessions/tok1234abcd')));
+  });
+});
+
+describe('trades — guest_link mode (uidB null)', () => {
+  test('uidA puede leer su trade aunque uidB sea null', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'trades/t1'), {
+        uidA: 'alice',
+        uidB: null,
+        guestContact: 'wa:+5491100000',
+        stickersAtoB: ['ARG1'],
+        stickersBtoA: ['BRA2'],
+        completedAt: Date.now(),
+      });
+    });
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await assertSucceeds(getDoc(doc(alice, 'trades/t1')));
+  });
+
+  test('otro usuario NO puede leer un trade ajeno con uidB null', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'trades/t1'), {
+        uidA: 'alice',
+        uidB: null,
+        completedAt: Date.now(),
+      });
+    });
+    const bob = testEnv.authenticatedContext('bob').firestore();
+    await assertFails(getDoc(doc(bob, 'trades/t1')));
+  });
+});
+
 // =====================================================================
 // Tests added for security audit findings — Stage 6 verification
 // =====================================================================

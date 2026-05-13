@@ -12,4 +12,11 @@ export { createTilopayCheckout, confirmTilopayPayment, devCompleteOrder } from '
 export { verifyPlayPurchase } from './playBilling';
 export { getPublicAlbum } from './publicAlbum';
 export { joinTradeSession, commitTradeSession, cancelTradeSession, createTradeSession } from './tradeSessions';
+export {
+  createGuestLink,
+  getGuestSession,
+  submitGuestOffer,
+  commitGuestTrade,
+  cancelGuestSession,
+} from './guestTradeSessions';
 export { requestAccountDeletion } from './deleteAccount';

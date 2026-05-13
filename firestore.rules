@@ -293,12 +293,27 @@ service cloud.firestore {
 
     // trades: historial inmutable de intercambios completados.
     // Lectura solo participantes. Escritura solo backend (Cloud Function commitTradeSession).
+    // Para intercambios via guest_link, uidB puede ser null (guest sin cuenta). En ese caso
+    // solo uidA puede leer.
     match /trades/{tradeId} {
       allow read: if isSignedIn() && (
                     resource.data.uidA == request.auth.uid ||
-                    resource.data.uidB == request.auth.uid
+                    (resource.data.uidB != null && resource.data.uidB == request.auth.uid)
                   );
       allow write: if false;
+    }
+
+    // guestTradeSessions: sesiones asíncronas iniciadas por un app user con un
+    // contraparte sin cuenta. El guest interactúa vía HTTP Cloud Functions usando
+    // el token como prueba de posesión. Todo acceso al doc va por backend
+    // (admin SDK), por eso el cliente queda bloqueado completamente.
+    // El app user dueño consulta el estado vía la Cloud Function getGuestSession
+    // (que no requiere auth pero sí token correcto). Si más adelante necesitamos
+    // que el host vea su sesión desde la app sin pasar por HTTP, se puede
+    // abrir lectura específica al hostUid; por ahora cerrado para minimizar
+    // superficie.
+    match /guestTradeSessions/{token} {
+      allow read, write: if false;
     }
 
     // Por defecto, todo lo demás bloqueado.
