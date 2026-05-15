@@ -7,7 +7,6 @@ import { buildRepeatedShareText } from './utils/listCompare';
 import { useAlbumStore } from '../../store/albumStore';
 import { allStickers } from '../album/data/albumCatalog';
 
-import { ScreenShell } from '../../components/ScreenShell';
 import { useUserStore } from '../../store/userStore';
 import { useTradeStore } from '../../store/tradeStore';
 import { createSession, findActiveSessionForUser, TradeError } from '../../services/tradeSessionService';
@@ -16,6 +15,46 @@ import { colors, radii, spacing } from '../../constants/theme';
 import type { TradeStackParamList } from '../../types/navigation';
 import { QRScanner } from './components/QRScanner';
 
+type Step = 'root' | 'intercambiar' | 'presencial';
+
+type OptionCard = {
+  icon: string;
+  title: string;
+  sub: string;
+  onPress: () => void;
+  primary?: boolean;
+  badge?: string;
+};
+
+function StepOptions({ options }: { options: OptionCard[] }) {
+  return (
+    <View style={styles.options}>
+      {options.map((opt) => (
+        <Pressable
+          key={opt.title}
+          onPress={opt.onPress}
+          style={({ pressed }) => [
+            styles.card,
+            opt.primary && styles.cardPrimary,
+            pressed && styles.pressed,
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardIcon}>{opt.icon}</Text>
+            {opt.badge ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{opt.badge}</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={[styles.cardTitle, opt.primary && styles.cardTitlePrimary]}>{opt.title}</Text>
+          <Text style={[styles.cardSub, opt.primary && styles.cardSubPrimary]}>{opt.sub}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 export function TradeHomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NavigationProp<TradeStackParamList>>();
@@ -23,8 +62,15 @@ export function TradeHomeScreen() {
   const demoMode = useUserStore((s) => s.demoMode);
   const closeTradeModal = useTradeStore((s) => s.closeModal);
   const statuses = useAlbumStore((s) => s.statuses);
+  const [step, setStep] = useState<Step>('root');
   const [busy, setBusy] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
+
+  const handleBack = useCallback(() => {
+    if (step === 'presencial') { setStep('intercambiar'); return; }
+    if (step === 'intercambiar') { setStep('root'); return; }
+    closeTradeModal();
+  }, [step, closeTradeModal]);
 
   const handleCreate = useCallback(async () => {
     if (!user || demoMode) {
@@ -63,18 +109,6 @@ export function TradeHomeScreen() {
     navigation.navigate('TradeJoin', {});
   }, [user, demoMode, navigation]);
 
-  const handleCompareList = useCallback(() => {
-    navigation.navigate('TradeListCompare');
-  }, [navigation]);
-
-  const handleShareRepeated = useCallback(() => {
-    const repeatedCodes = allStickers
-      .filter((s) => statuses[s.id] === 'repeated')
-      .map((s) => s.displayCode);
-    const text = buildRepeatedShareText(statuses);
-    shareTradeCard(repeatedCodes, text);
-  }, [statuses]);
-
   const handleShareLink = useCallback(() => {
     if (!user || demoMode) {
       Alert.alert('Iniciá sesión', 'Necesitás una cuenta para generar un link de intercambio.');
@@ -103,6 +137,88 @@ export function TradeHomeScreen() {
     navigation.navigate('TradeJoin', { prefilledCode: code });
   }, [navigation]);
 
+  const handleShareRepeated = useCallback(() => {
+    const repeatedCodes = allStickers
+      .filter((s) => statuses[s.id] === 'repeated')
+      .map((s) => s.displayCode);
+    const text = buildRepeatedShareText(statuses);
+    shareTradeCard(repeatedCodes, text);
+  }, [statuses]);
+
+  const stepMeta: Record<Step, { eyebrow: string; question: string }> = {
+    root: { eyebrow: 'Intercambio', question: '¿Qué querés hacer?' },
+    intercambiar: { eyebrow: 'Intercambiar', question: '¿La otra persona tiene la app?' },
+    presencial: { eyebrow: 'Con la app', question: '¿Cómo te conectás?' },
+  };
+
+  const rootOptions: OptionCard[] = [
+    {
+      icon: '📋',
+      title: 'Ver qué me sirve',
+      sub: 'Pegá la lista de otro coleccionista y ves cuáles te faltan.',
+      onPress: () => navigation.navigate('TradeListCompare'),
+    },
+    {
+      icon: '🔄',
+      title: 'Intercambiar figus',
+      sub: 'Acordá un cambio con alguien y actualizá tu álbum.',
+      onPress: () => setStep('intercambiar'),
+      primary: true,
+    },
+    {
+      icon: '📤',
+      title: 'Compartir mis repes',
+      sub: 'Mandá tu lista de repetidas por WhatsApp.',
+      onPress: handleShareRepeated,
+    },
+  ];
+
+  const intercambiarOptions: OptionCard[] = [
+    {
+      icon: '📱',
+      title: 'No tiene la app',
+      sub: 'Le mandás un link. Pega su lista y ves el match sin instalar nada.',
+      onPress: handleShareLink,
+      badge: 'NUEVO',
+    },
+    {
+      icon: '👥',
+      title: 'Los dos tienen la app',
+      sub: 'Intercambio presencial, cara a cara con QR o código.',
+      onPress: () => setStep('presencial'),
+      primary: true,
+    },
+  ];
+
+  const presencialOptions: OptionCard[] = [
+    {
+      icon: '➕',
+      title: 'Crear sesión',
+      sub: 'Mostrás un QR para que el otro escanee.',
+      onPress: handleCreate,
+      primary: true,
+    },
+    {
+      icon: '📷',
+      title: 'Escanear QR',
+      sub: 'Apuntás al QR del otro coleccionista.',
+      onPress: handleScan,
+    },
+    {
+      icon: '🔢',
+      title: 'Tengo un código',
+      sub: 'Ingresás el código de 6 caracteres.',
+      onPress: handleJoin,
+    },
+  ];
+
+  const currentOptions =
+    step === 'root' ? rootOptions :
+    step === 'intercambiar' ? intercambiarOptions :
+    presencialOptions;
+
+  const meta = stepMeta[step];
+
   return (
     <ScrollView
       style={styles.scroll}
@@ -110,95 +226,36 @@ export function TradeHomeScreen() {
     >
       <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
         <Pressable
-          onPress={closeTradeModal}
+          onPress={handleBack}
           accessibilityRole="button"
-          accessibilityLabel="Cerrar y volver"
+          accessibilityLabel="Volver"
           style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
           hitSlop={10}
         >
           <Text style={styles.backBtnText}>‹ Volver</Text>
         </Pressable>
-      </View>
 
-      <ScreenShell
-        eyebrow="Intercambio"
-        title="Cambiá figus con cualquiera"
-        description="Con otro usuario de la app o con alguien que ni la conoce. Elegí cómo querés intercambiar."
-      />
-
-      <View style={styles.actions}>
-        <Pressable
-          onPress={handleCompareList}
-          style={({ pressed }) => [styles.cta, styles.ctaSecondary, pressed && styles.pressed]}
-        >
-          <Text style={[styles.ctaTitle, styles.ctaTitleSecondary]}>Comparar lista</Text>
-          <Text style={[styles.ctaSub, styles.ctaSubSecondary]}>
-            Pegá la lista de otro coleccionista y ves cuáles te sirven.
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={handleShareRepeated}
-          style={({ pressed }) => [styles.cta, styles.ctaSecondary, pressed && styles.pressed]}
-        >
-          <Text style={[styles.ctaTitle, styles.ctaTitleSecondary]}>Compartir mis repes</Text>
-          <Text style={[styles.ctaSub, styles.ctaSubSecondary]}>
-            Mandá tu lista de repetidas por WhatsApp.
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={handleShareLink}
-          style={({ pressed }) => [styles.cta, styles.ctaShare, pressed && styles.pressed]}
-        >
-          <View style={styles.badgeRow}>
-            <Text style={styles.badge}>NUEVO</Text>
+        {step !== 'root' && (
+          <View style={styles.breadcrumb}>
+            <Text style={styles.breadcrumbText}>
+              {step === 'intercambiar' ? 'Intercambio' : 'Intercambio · Con la app'}
+            </Text>
           </View>
-          <Text style={styles.ctaTitleShare}>Intercambiar por link</Text>
-          <Text style={styles.ctaSubShare}>
-            Para alguien que NO usa la app. Mandás un link por WhatsApp, pega su lista y listo.
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={handleCreate}
-          disabled={busy}
-          style={({ pressed }) => [styles.cta, styles.ctaPrimary, pressed && styles.pressed, busy && styles.disabled]}
-        >
-          {busy ? (
-            <ActivityIndicator color="#001A0A" />
-          ) : (
-            <>
-              <Text style={styles.ctaTitle}>Intercambio presencial (QR)</Text>
-              <Text style={styles.ctaSub}>Pareá con otro usuario de la app, cara a cara.</Text>
-            </>
-          )}
-        </Pressable>
-
-        <Pressable
-          onPress={handleScan}
-          style={({ pressed }) => [styles.cta, styles.ctaSecondary, pressed && styles.pressed]}
-        >
-          <Text style={[styles.ctaTitle, styles.ctaTitleSecondary]}>Escanear QR</Text>
-          <Text style={[styles.ctaSub, styles.ctaSubSecondary]}>Apuntá al QR del otro coleccionista.</Text>
-        </Pressable>
-
-        <Pressable
-          onPress={handleJoin}
-          style={({ pressed }) => [styles.cta, styles.ctaSecondary, pressed && styles.pressed]}
-        >
-          <Text style={[styles.ctaTitle, styles.ctaTitleSecondary]}>Unirme con código</Text>
-          <Text style={[styles.ctaSub, styles.ctaSubSecondary]}>Tipeá el código de 6 caracteres.</Text>
-        </Pressable>
+        )}
       </View>
 
-      <View style={styles.howWrap}>
-        <Text style={styles.howTitle}>Cómo funciona el link</Text>
-        <Text style={styles.howStep}>1. Generás un link con tu lista (repetidas + faltantes).</Text>
-        <Text style={styles.howStep}>2. Se lo mandás a la otra persona por WhatsApp.</Text>
-        <Text style={styles.howStep}>3. Abre el link sin instalar nada, pega su lista.</Text>
-        <Text style={styles.howStep}>4. Te llega aviso, confirmás y tu álbum se actualiza.</Text>
+      <View style={styles.header}>
+        <Text style={styles.eyebrow}>{meta.eyebrow}</Text>
+        <Text style={styles.question}>{meta.question}</Text>
       </View>
+
+      {busy && step === 'presencial' ? (
+        <View style={styles.busyWrap}>
+          <ActivityIndicator color={colors.primary} size="large" />
+        </View>
+      ) : (
+        <StepOptions options={currentOptions} />
+      )}
 
       {scannerOpen ? (
         <QRScanner onResult={handleScanResult} onClose={() => setScannerOpen(false)} />
@@ -216,11 +273,13 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
   },
   topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
+    gap: spacing.md,
   },
   backBtn: {
-    alignSelf: 'flex-start',
     paddingVertical: spacing.xs,
     paddingRight: spacing.md,
   },
@@ -229,102 +288,95 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
-  actions: {
+  breadcrumb: {
+    flex: 1,
+  },
+  breadcrumbText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  header: {
     paddingHorizontal: spacing.lg,
-    marginTop: spacing.lg,
+    paddingBottom: spacing.lg,
+    gap: spacing.xs,
+  },
+  eyebrow: {
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+  question: {
+    color: colors.text,
+    fontSize: 26,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+  },
+  options: {
+    paddingHorizontal: spacing.lg,
     gap: spacing.md,
   },
-  cta: {
+  card: {
+    backgroundColor: colors.card,
+    borderColor: colors.border,
+    borderWidth: 1,
     borderRadius: radii.lg,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
-    borderWidth: 1,
   },
-  ctaPrimary: {
+  cardPrimary: {
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
-  ctaSecondary: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
-  },
-  ctaShare: {
-    backgroundColor: colors.surface,
-    borderColor: colors.accent,
-    borderWidth: 2,
-  },
-  badgeRow: {
+  cardHeader: {
     flexDirection: 'row',
-    marginBottom: 8,
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  cardIcon: {
+    fontSize: 24,
   },
   badge: {
-    alignSelf: 'flex-start',
     backgroundColor: colors.accent,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    overflow: 'hidden',
+  },
+  badgeText: {
     color: '#001A0A',
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 1.2,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    overflow: 'hidden',
   },
-  ctaTitleShare: {
+  cardTitle: {
     color: colors.text,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '900',
   },
-  ctaSubShare: {
+  cardTitlePrimary: {
+    color: '#001A0A',
+  },
+  cardSub: {
     color: colors.textMuted,
-    marginTop: 4,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
     lineHeight: 18,
+    marginTop: 4,
+  },
+  cardSubPrimary: {
+    color: '#0A2E1A',
   },
   pressed: {
-    opacity: 0.85,
+    opacity: 0.82,
   },
-  disabled: {
-    opacity: 0.6,
-  },
-  ctaTitle: {
-    color: '#001A0A',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  ctaTitleSecondary: {
-    color: colors.text,
-  },
-  ctaSub: {
-    color: '#0A2E1A',
-    marginTop: 4,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  ctaSubSecondary: {
-    color: colors.textMuted,
-    fontWeight: '500',
-  },
-  howWrap: {
-    marginTop: spacing.xl,
-    marginHorizontal: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderColor: colors.border,
-    borderWidth: 1,
-    padding: spacing.lg,
-  },
-  howTitle: {
-    color: colors.accent,
-    fontWeight: '800',
-    fontSize: 13,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: spacing.sm,
-  },
-  howStep: {
-    color: colors.text,
-    fontSize: 14,
-    lineHeight: 22,
+  busyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: spacing.xl * 2,
   },
 });
