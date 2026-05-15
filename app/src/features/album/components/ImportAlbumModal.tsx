@@ -46,6 +46,7 @@ export function ImportAlbumModal({ visible, onClose, source }: ImportAlbumModalP
   const [addToWishlist, setAddToWishlist] = useState(true);
   const [preview, setPreview] = useState<ImportResult | null>(null);
   const [showUnknown, setShowUnknown] = useState(false);
+  const [confirmReplace, setConfirmReplace] = useState(false);
 
   const stats = useMemo(() => {
     if (!preview) return null;
@@ -106,14 +107,7 @@ export function ImportAlbumModal({ visible, onClose, source }: ImportAlbumModalP
   const handleApply = () => {
     if (!preview || preview.ok.length === 0) return;
     if (replaceMode) {
-      Alert.alert(
-        '¿Reemplazar todo?',
-        'Esto borra todo lo que tenés marcado y aplica solo la lista nueva.',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Reemplazar', style: 'destructive', onPress: doApply },
-        ],
-      );
+      setConfirmReplace(true);
     } else {
       doApply();
     }
@@ -177,6 +171,29 @@ export function ImportAlbumModal({ visible, onClose, source }: ImportAlbumModalP
             >
               <Text style={styles.btnSecondaryText}>Previsualizar</Text>
             </Pressable>
+
+            {confirmReplace ? (
+              <View style={styles.confirmBox}>
+                <Text style={styles.confirmTitle}>¿Reemplazar todo?</Text>
+                <Text style={styles.confirmText}>
+                  Esto borra todo lo que tenés marcado y aplica solo la lista nueva.
+                </Text>
+                <View style={styles.confirmRow}>
+                  <Pressable
+                    onPress={() => setConfirmReplace(false)}
+                    style={({ pressed }) => [styles.btn, styles.btnSecondary, styles.btnFlex, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.btnSecondaryText}>Cancelar</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => { setConfirmReplace(false); doApply(); }}
+                    style={({ pressed }) => [styles.btn, styles.btnDanger, styles.btnFlex, pressed && styles.pressed]}
+                  >
+                    <Text style={styles.btnDangerText}>Reemplazar</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
 
             {preview && stats ? (
               <View style={styles.previewBox}>
@@ -370,5 +387,39 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
+  },
+  confirmBox: {
+    backgroundColor: colors.surface,
+    borderColor: '#E8001C',
+    borderWidth: 1,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  confirmTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  confirmText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  confirmRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  btnFlex: {
+    flex: 1,
+  },
+  btnDanger: {
+    backgroundColor: '#E8001C',
+  },
+  btnDangerText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 15,
   },
 });
