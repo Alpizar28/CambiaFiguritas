@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { shareTradeCard } from '../../utils/shareTradeCard';
@@ -18,13 +19,94 @@ import { QRScanner } from './components/QRScanner';
 type Step = 'root' | 'intercambiar' | 'presencial';
 
 type OptionCard = {
-  icon: string;
+  icon: React.ReactNode;
   title: string;
   sub: string;
   onPress: () => void;
   primary?: boolean;
   badge?: string;
 };
+
+function IconList({ color }: { color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Rect x="9" y="3" width="6" height="4" rx="1" stroke={color} strokeWidth={2} />
+      <Line x1="9" y1="12" x2="15" y2="12" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Line x1="9" y1="16" x2="13" y2="16" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconSwap({ color }: { color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path d="M5 7h14M15 4l4 3-4 3" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M19 17H5M9 14l-4 3 4 3" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function IconShare({ color }: { color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M16 6l-4-4-4 4" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <Line x1="12" y1="2" x2="12" y2="15" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconPhone({ color }: { color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Rect x="5" y="2" width="14" height="20" rx="2" stroke={color} strokeWidth={2} />
+      <Circle cx="12" cy="18" r="1" fill={color} />
+    </Svg>
+  );
+}
+
+function IconUsers({ color }: { color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Circle cx="9" cy="7" r="3" stroke={color} strokeWidth={2} />
+      <Path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Path d="M16 3.13a4 4 0 010 7.75" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Path d="M21 21v-2a4 4 0 00-3-3.87" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function IconQR({ color }: { color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Rect x="3" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth={2} />
+      <Rect x="14" y="3" width="7" height="7" rx="1" stroke={color} strokeWidth={2} />
+      <Rect x="3" y="14" width="7" height="7" rx="1" stroke={color} strokeWidth={2} />
+      <Path d="M14 14h3v3h-3zM17 17h4v4h-4zM14 21h3" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function IconCamera({ color }: { color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <Circle cx="12" cy="13" r="4" stroke={color} strokeWidth={2} />
+    </Svg>
+  );
+}
+
+function IconHash({ color }: { color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Line x1="4" y1="9" x2="20" y2="9" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Line x1="4" y1="15" x2="20" y2="15" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Line x1="10" y1="3" x2="8" y2="21" stroke={color} strokeWidth={2} strokeLinecap="round" />
+      <Line x1="16" y1="3" x2="14" y2="21" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+}
 
 function StepOptions({ options }: { options: OptionCard[] }) {
   return (
@@ -40,7 +122,7 @@ function StepOptions({ options }: { options: OptionCard[] }) {
           ]}
         >
           <View style={styles.cardHeader}>
-            <Text style={styles.cardIcon}>{opt.icon}</Text>
+            {opt.icon}
             {opt.badge ? (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{opt.badge}</Text>
@@ -153,20 +235,20 @@ export function TradeHomeScreen() {
 
   const rootOptions: OptionCard[] = [
     {
-      icon: '📋',
+      icon: <IconList color={colors.textMuted} />,
       title: 'Ver qué me sirve',
       sub: 'Pegá la lista de otro coleccionista y ves cuáles te faltan.',
       onPress: () => navigation.navigate('TradeListCompare'),
     },
     {
-      icon: '🔄',
+      icon: <IconSwap color="#001A0A" />,
       title: 'Intercambiar figus',
       sub: 'Acordá un cambio con alguien y actualizá tu álbum.',
       onPress: () => setStep('intercambiar'),
       primary: true,
     },
     {
-      icon: '📤',
+      icon: <IconShare color={colors.textMuted} />,
       title: 'Compartir mis repes',
       sub: 'Mandá tu lista de repetidas por WhatsApp.',
       onPress: handleShareRepeated,
@@ -175,14 +257,14 @@ export function TradeHomeScreen() {
 
   const intercambiarOptions: OptionCard[] = [
     {
-      icon: '📱',
+      icon: <IconPhone color={colors.textMuted} />,
       title: 'No tiene la app',
       sub: 'Le mandás un link. Pega su lista y ves el match sin instalar nada.',
       onPress: handleShareLink,
       badge: 'NUEVO',
     },
     {
-      icon: '👥',
+      icon: <IconUsers color="#001A0A" />,
       title: 'Los dos tienen la app',
       sub: 'Intercambio presencial, cara a cara con QR o código.',
       onPress: () => setStep('presencial'),
@@ -192,20 +274,20 @@ export function TradeHomeScreen() {
 
   const presencialOptions: OptionCard[] = [
     {
-      icon: '➕',
+      icon: <IconQR color="#001A0A" />,
       title: 'Crear sesión',
       sub: 'Mostrás un QR para que el otro escanee.',
       onPress: handleCreate,
       primary: true,
     },
     {
-      icon: '📷',
+      icon: <IconCamera color={colors.textMuted} />,
       title: 'Escanear QR',
       sub: 'Apuntás al QR del otro coleccionista.',
       onPress: handleScan,
     },
     {
-      icon: '🔢',
+      icon: <IconHash color={colors.textMuted} />,
       title: 'Tengo un código',
       sub: 'Ingresás el código de 6 caracteres.',
       onPress: handleJoin,
@@ -335,9 +417,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     marginBottom: spacing.sm,
-  },
-  cardIcon: {
-    fontSize: 24,
   },
   badge: {
     backgroundColor: colors.accent,

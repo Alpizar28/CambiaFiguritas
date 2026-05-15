@@ -118,6 +118,18 @@ export function TradeHostScreen() {
       style={styles.scroll}
       contentContainerStyle={[styles.content, { paddingBottom: spacing.xl + insets.bottom }]}
     >
+      <View style={[styles.topBar, { paddingTop: insets.top }]}>
+        <Pressable
+          onPress={handleCancel}
+          accessibilityRole="button"
+          accessibilityLabel="Volver"
+          style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
+          hitSlop={10}
+        >
+          <Text style={styles.backBtnText}>‹ Volver</Text>
+        </Pressable>
+      </View>
+
       <View style={styles.header}>
         <Text style={styles.eyebrow}>Esperando…</Text>
         <Text style={styles.title}>Compartí este código</Text>
@@ -171,6 +183,20 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
+  },
+  topBar: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  backBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.xs,
+    paddingRight: spacing.md,
+  },
+  backBtnText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '700',
   },
   center: {
     flex: 1,
