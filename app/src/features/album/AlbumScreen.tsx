@@ -776,18 +776,6 @@ export function AlbumScreen() {
               ) : (
                 <View style={styles.pagerLeft} />
               )}
-              <Pressable
-                onPress={() => openTradeModal({ kind: 'home' })}
-                accessibilityRole="button"
-                accessibilityLabel="Intercambiar"
-                style={({ pressed }) => [styles.tradeFab, pressed && { opacity: 0.85 }]}
-              >
-                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                  <Path d="M5 7h14M15 4l4 3-4 3" stroke={colors.background} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                  <Path d="M19 17H5M9 14l-4 3 4 3" stroke={colors.background} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                </Svg>
-                <Text style={styles.tradeFabText}>Intercambiar</Text>
-              </Pressable>
             </View>
             {activeGroup.pages.length > 1 && (
               <Tooltip
@@ -927,18 +915,6 @@ export function AlbumScreen() {
               </View>
             </ScrollView>
 
-            <Pressable
-              onPress={() => openTradeModal({ kind: 'home' })}
-              accessibilityRole="button"
-              accessibilityLabel="Intercambiar"
-              style={({ pressed }) => [styles.tradeFab, pressed && { opacity: 0.85 }]}
-            >
-              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                <Path d="M5 7h14M15 4l4 3-4 3" stroke={colors.background} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                <Path d="M19 17H5M9 14l-4 3 4 3" stroke={colors.background} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-              </Svg>
-              <Text style={styles.tradeFabText}>Intercambiar</Text>
-            </Pressable>
           </View>
 
           <View style={styles.countryNavigator}>
