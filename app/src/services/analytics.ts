@@ -126,7 +126,10 @@ type AnalyticsEvent =
   | { name: 'trade_confirmed'; params: { sessionId: string; role: 'host' | 'guest'; givesCount: number; receivesCount: number } }
   | { name: 'trade_completed'; params: { sessionId: string; tradeId: string; givesCount: number; receivesCount: number } }
   | { name: 'trade_cancelled'; params: { sessionId: string; reason: string } }
-  | { name: 'trade_commit_failed'; params: { sessionId: string; reason: string } };
+  | { name: 'trade_commit_failed'; params: { sessionId: string; reason: string } }
+  | { name: 'trade_list_compare_run'; params: { parsedCount: number; iNeedCount: number; unknownCount: number } }
+  | { name: 'trade_list_compare_copied' }
+  | { name: 'trade_list_compare_marked_received'; params: { count: number } };
 
 let analyticsInstance: Analytics | null = null;
 let initPromise: Promise<Analytics | null> | null = null;

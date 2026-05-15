@@ -2,6 +2,10 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
+import { shareTradeCard } from '../../utils/shareTradeCard';
+import { buildRepeatedShareText } from './utils/listCompare';
+import { useAlbumStore } from '../../store/albumStore';
+import { allStickers } from '../album/data/albumCatalog';
 
 import { ScreenShell } from '../../components/ScreenShell';
 import { useUserStore } from '../../store/userStore';
@@ -18,6 +22,7 @@ export function TradeHomeScreen() {
   const user = useUserStore((s) => s.user);
   const demoMode = useUserStore((s) => s.demoMode);
   const closeTradeModal = useTradeStore((s) => s.closeModal);
+  const statuses = useAlbumStore((s) => s.statuses);
   const [busy, setBusy] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
 
@@ -57,6 +62,18 @@ export function TradeHomeScreen() {
     }
     navigation.navigate('TradeJoin', {});
   }, [user, demoMode, navigation]);
+
+  const handleCompareList = useCallback(() => {
+    navigation.navigate('TradeListCompare');
+  }, [navigation]);
+
+  const handleShareRepeated = useCallback(() => {
+    const repeatedCodes = allStickers
+      .filter((s) => statuses[s.id] === 'repeated')
+      .map((s) => s.displayCode);
+    const text = buildRepeatedShareText(statuses);
+    shareTradeCard(repeatedCodes, text);
+  }, [statuses]);
 
   const handleShareLink = useCallback(() => {
     if (!user || demoMode) {
@@ -110,6 +127,26 @@ export function TradeHomeScreen() {
       />
 
       <View style={styles.actions}>
+        <Pressable
+          onPress={handleCompareList}
+          style={({ pressed }) => [styles.cta, styles.ctaSecondary, pressed && styles.pressed]}
+        >
+          <Text style={[styles.ctaTitle, styles.ctaTitleSecondary]}>Comparar lista</Text>
+          <Text style={[styles.ctaSub, styles.ctaSubSecondary]}>
+            Pegá la lista de otro coleccionista y ves cuáles te sirven.
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={handleShareRepeated}
+          style={({ pressed }) => [styles.cta, styles.ctaSecondary, pressed && styles.pressed]}
+        >
+          <Text style={[styles.ctaTitle, styles.ctaTitleSecondary]}>Compartir mis repes</Text>
+          <Text style={[styles.ctaSub, styles.ctaSubSecondary]}>
+            Mandá tu lista de repetidas por WhatsApp.
+          </Text>
+        </Pressable>
+
         <Pressable
           onPress={handleShareLink}
           style={({ pressed }) => [styles.cta, styles.ctaShare, pressed && styles.pressed]}

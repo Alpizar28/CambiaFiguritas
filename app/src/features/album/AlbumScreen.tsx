@@ -32,7 +32,6 @@ import Svg, { Path } from 'react-native-svg';
 import { ShareCardModal } from '../profile/components/ShareCardModal';
 import { ImportAlbumModal } from './components/ImportAlbumModal';
 import { ScanFab } from '../../components/ScanFab';
-import { TradeFab } from '../../components/TradeFab';
 import { ScanScreen } from '../scan/ScanScreen';
 import { useTradeStore } from '../../store/tradeStore';
 import type { AlbumSlot, CountryAlbumPage, Sticker, StickerStatus } from './types';
@@ -776,6 +775,18 @@ export function AlbumScreen() {
               ) : (
                 <View style={styles.pagerLeft} />
               )}
+              <Pressable
+                onPress={() => openTradeModal({ kind: 'home' })}
+                accessibilityRole="button"
+                accessibilityLabel="Intercambiar"
+                style={({ pressed }) => [styles.tradeFab, pressed && { opacity: 0.85 }]}
+              >
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                  <Path d="M5 7h14M15 4l4 3-4 3" stroke={colors.background} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  <Path d="M19 17H5M9 14l-4 3 4 3" stroke={colors.background} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+                <Text style={styles.tradeFabText}>Intercambiar</Text>
+              </Pressable>
             </View>
             {activeGroup.pages.length > 1 && (
               <Tooltip
@@ -802,7 +813,6 @@ export function AlbumScreen() {
       {/* ScanFab oculto temporalmente */}
       <ScanScreen visible={scanOpen} onClose={() => setScanOpen(false)} />
       <ImportAlbumModal visible={importModalOpen} onClose={() => setImportModalOpen(false)} source="album" />
-      <TradeFab onPress={() => openTradeModal({ kind: 'home' })} />
       </View>
     );
   }
@@ -915,6 +925,18 @@ export function AlbumScreen() {
               </View>
             </ScrollView>
 
+            <Pressable
+              onPress={() => openTradeModal({ kind: 'home' })}
+              accessibilityRole="button"
+              accessibilityLabel="Intercambiar"
+              style={({ pressed }) => [styles.tradeFab, pressed && { opacity: 0.85 }]}
+            >
+              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                <Path d="M5 7h14M15 4l4 3-4 3" stroke={colors.background} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M19 17H5M9 14l-4 3 4 3" stroke={colors.background} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+              <Text style={styles.tradeFabText}>Intercambiar</Text>
+            </Pressable>
           </View>
 
           <View style={styles.countryNavigator}>
@@ -986,7 +1008,6 @@ export function AlbumScreen() {
       <ImportAlbumModal visible={importModalOpen} onClose={() => setImportModalOpen(false)} source="album" />
       {/* ScanFab oculto temporalmente */}
       <ScanScreen visible={scanOpen} onClose={() => setScanOpen(false)} />
-      <TradeFab onPress={() => openTradeModal({ kind: 'home' })} />
       <StickerActionSheet
         visible={!!sheetSticker}
         sticker={sheetSticker}

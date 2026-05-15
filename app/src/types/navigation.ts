@@ -20,4 +20,5 @@ export type TradeStackParamList = {
   TradeComplete: { sessionId: string };
   TradeShare: undefined;
   TradeGuestWeb: { token: string };
+  TradeListCompare: undefined;
 };

@@ -7,6 +7,7 @@ import { TradeReviewScreen } from './TradeReviewScreen';
 import { TradeCompleteScreen } from './TradeCompleteScreen';
 import { TradeShareScreen } from './TradeShareScreen';
 import { TradeGuestWebScreen } from './TradeGuestWebScreen';
+import { TradeListCompareScreen } from './TradeListCompareScreen';
 import { colors } from '../../constants/theme';
 import type { TradeStackParamList } from '../../types/navigation';
 
@@ -37,6 +38,7 @@ export function TradeNavigator({ initialRoute = 'TradeHome', initialParams }: Tr
       <Stack.Screen name="TradeReview" component={TradeReviewScreen} />
       <Stack.Screen name="TradeComplete" component={TradeCompleteScreen} />
       <Stack.Screen name="TradeShare" component={TradeShareScreen} />
+      <Stack.Screen name="TradeListCompare" component={TradeListCompareScreen} />
       <Stack.Screen
         name="TradeGuestWeb"
         component={TradeGuestWebScreen}
