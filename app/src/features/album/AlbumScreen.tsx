@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { radii, spacing } from '../../constants/theme';
+import { colors, radii, spacing } from '../../constants/theme';
 import { getCountryAccent, pickReadableTextOn, tintWithAlpha } from './utils/countryAccent';
 import { useAlbumStore } from '../../store/albumStore';
 import { CountryInfoSlot, GroupInfoSlot } from './components/AlbumInfoSlot';
@@ -28,6 +28,7 @@ import { track } from '../../services/analytics';
 import { Tooltip } from '../../components/Tooltip';
 import { useUserStore } from '../../store/userStore';
 
+import Svg, { Path } from 'react-native-svg';
 import { ShareCardModal } from '../profile/components/ShareCardModal';
 import { ImportAlbumModal } from './components/ImportAlbumModal';
 import { ScanFab } from '../../components/ScanFab';
@@ -36,6 +37,8 @@ import { ScanScreen } from '../scan/ScanScreen';
 import { useTradeStore } from '../../store/tradeStore';
 import type { AlbumSlot, CountryAlbumPage, Sticker, StickerStatus } from './types';
 import { fuzzyContains } from './utils/fuzzyMatch';
+import { shareTradeCard } from '../../utils/shareTradeCard';
+import { buildRepeatedShareText } from '../trade/utils/listCompare';
 
 type AlbumFilter = 'all' | StickerStatus;
 
@@ -120,6 +123,31 @@ const matchesAlbumFilter = (status: StickerStatus, filter: AlbumFilter): boolean
 
 const COUNTRY_BTN_WIDTH = 70;
 
+function IconBtn({ label, onPress, icon }: { label: string; onPress: () => void; icon: string }) {
+  const [tip, setTip] = useState(false);
+  return (
+    <View style={{ position: 'relative' }}>
+      <Pressable
+        accessibilityLabel={label}
+        onPress={onPress}
+        onLongPress={() => setTip(true)}
+        onHoverIn={() => setTip(true)}
+        onHoverOut={() => setTip(false)}
+        onPressOut={() => setTimeout(() => setTip(false), 800)}
+        style={({ pressed }) => [styles.iconButton, pressed && { opacity: 0.75 }]}
+        hitSlop={8}
+      >
+        <Text style={styles.iconButtonText}>{icon}</Text>
+      </Pressable>
+      {tip ? (
+        <View style={styles.iconTooltip} pointerEvents="none">
+          <Text style={styles.iconTooltipText}>{label}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 export function AlbumScreen() {
   const { width } = useWindowDimensions();
   const [activePageIndex, setActivePageIndex] = useState(0);
@@ -188,6 +216,16 @@ export function AlbumScreen() {
     track({ name: 'share_album_clicked', params: { stats: 'header_card' } });
     setShareModalOpen(true);
   };
+
+  const handleShareRepeated = useCallback(() => {
+    haptic.tap();
+    const repeatedCodes = allStickers
+      .filter((s) => statuses[s.id] === 'repeated')
+      .map((s) => s.displayCode);
+    const text = buildRepeatedShareText(statuses);
+    shareTradeCard(repeatedCodes, text);
+    track({ name: 'share_album_clicked', params: { stats: 'repeated' } });
+  }, [statuses]);
   const normalizedQuery = query.trim().toLowerCase();
   // 'especiales' (FW) y 'cocacola' (CC) usan grid plano, sin layout 2-paginas.
   const isSpecials = activeGroup.country.id === 'especiales' || activeGroup.country.id === 'cocacola';
@@ -471,14 +509,11 @@ export function AlbumScreen() {
                 {activeGroup.country.flag ? `${activeGroup.country.flag} ` : ''}{activeGroup.country.name}
               </Text>
             </View>
-            <Pressable
-              accessibilityLabel="Compartir tu figurita"
+            <IconBtn
+              label="Compartir álbum"
               onPress={handleShareCard}
-              style={styles.shareAlbumBtn}
-            >
-              <Text style={styles.shareAlbumIcon}>⬆</Text>
-              <Text style={styles.shareAlbumText}>Compartir figurita</Text>
-            </Pressable>
+              icon="⬆"
+            />
             <Pressable
               accessibilityLabel="Buscar"
               onPress={() => { haptic.tap(); setSearchOpen((v) => !v); }}
@@ -703,57 +738,57 @@ export function AlbumScreen() {
                 style={{ flex: 1 }}
               />
             </View>
-            {activeGroup.pages.length > 1 && (
-              <View style={[styles.pagerNavRow, { paddingBottom: insets.bottom + spacing.sm }]}>
-                <Pressable
-                  accessibilityLabel="Pagina anterior"
-                  disabled={activePageIndex === 0}
-                  onPress={() => {
-                    if (activePageIndex === 0) return;
-                    haptic.tap();
-                    const next = activePageIndex - 1;
-                    mobilePagerRef.current?.scrollToOffset({ offset: next * width, animated: true });
-                    setActivePageIndex(next);
-                  }}
-                  style={[styles.pagerChevron, activePageIndex === 0 && styles.pagerChevronDisabled]}
-                >
-                  <Text style={styles.pagerChevronText}>‹</Text>
-                </Pressable>
-                <View style={styles.pagerProgressCol}>
-                  <Text style={styles.pagerProgressLabel}>
-                    Pagina {activePageIndex + 1} / {activeGroup.pages.length}
+            <View style={[styles.pagerNavRow, { paddingBottom: insets.bottom + spacing.xs }]}>
+              {activeGroup.pages.length > 1 ? (
+                <View style={styles.pagerLeft}>
+                  <Pressable
+                    accessibilityLabel="Pagina anterior"
+                    disabled={activePageIndex === 0}
+                    onPress={() => {
+                      if (activePageIndex === 0) return;
+                      haptic.tap();
+                      const next = activePageIndex - 1;
+                      mobilePagerRef.current?.scrollToOffset({ offset: next * width, animated: true });
+                      setActivePageIndex(next);
+                    }}
+                    style={[styles.pagerChevron, activePageIndex === 0 && styles.pagerChevronDisabled]}
+                  >
+                    <Text style={styles.pagerChevronText}>‹</Text>
+                  </Pressable>
+                  <Text style={styles.pagerLabel}>
+                    {activePageIndex + 1}/{activeGroup.pages.length}
                   </Text>
-                  <View style={styles.pagerProgressTrack}>
-                    <View
-                      style={[
-                        styles.pagerProgressFill,
-                        {
-                          backgroundColor: activeAccent,
-                          width: `${((activePageIndex + 1) / activeGroup.pages.length) * 100}%` as any,
-                        },
-                      ]}
-                    />
-                  </View>
+                  <Pressable
+                    accessibilityLabel="Pagina siguiente"
+                    disabled={activePageIndex === activeGroup.pages.length - 1}
+                    onPress={() => {
+                      if (activePageIndex === activeGroup.pages.length - 1) return;
+                      haptic.tap();
+                      const next = activePageIndex + 1;
+                      mobilePagerRef.current?.scrollToOffset({ offset: next * width, animated: true });
+                      setActivePageIndex(next);
+                    }}
+                    style={[styles.pagerChevron, activePageIndex === activeGroup.pages.length - 1 && styles.pagerChevronDisabled]}
+                  >
+                    <Text style={styles.pagerChevronText}>›</Text>
+                  </Pressable>
                 </View>
-                <Pressable
-                  accessibilityLabel="Pagina siguiente"
-                  disabled={activePageIndex === activeGroup.pages.length - 1}
-                  onPress={() => {
-                    if (activePageIndex === activeGroup.pages.length - 1) return;
-                    haptic.tap();
-                    const next = activePageIndex + 1;
-                    mobilePagerRef.current?.scrollToOffset({ offset: next * width, animated: true });
-                    setActivePageIndex(next);
-                  }}
-                  style={[
-                    styles.pagerChevron,
-                    activePageIndex === activeGroup.pages.length - 1 && styles.pagerChevronDisabled,
-                  ]}
-                >
-                  <Text style={styles.pagerChevronText}>›</Text>
-                </Pressable>
-              </View>
-            )}
+              ) : (
+                <View style={styles.pagerLeft} />
+              )}
+              <Pressable
+                onPress={() => openTradeModal({ kind: 'home' })}
+                accessibilityRole="button"
+                accessibilityLabel="Intercambiar"
+                style={({ pressed }) => [styles.tradeFab, pressed && { opacity: 0.85 }]}
+              >
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                  <Path d="M5 7h14M15 4l4 3-4 3" stroke={colors.background} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                  <Path d="M19 17H5M9 14l-4 3 4 3" stroke={colors.background} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+                <Text style={styles.tradeFabText}>Intercambiar</Text>
+              </Pressable>
+            </View>
             {activeGroup.pages.length > 1 && (
               <Tooltip
                 id="album-page-pager"
@@ -891,6 +926,19 @@ export function AlbumScreen() {
                 })}
               </View>
             </ScrollView>
+
+            <Pressable
+              onPress={() => openTradeModal({ kind: 'home' })}
+              accessibilityRole="button"
+              accessibilityLabel="Intercambiar"
+              style={({ pressed }) => [styles.tradeFab, pressed && { opacity: 0.85 }]}
+            >
+              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                <Path d="M5 7h14M15 4l4 3-4 3" stroke={colors.background} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                <Path d="M19 17H5M9 14l-4 3 4 3" stroke={colors.background} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+              <Text style={styles.tradeFabText}>Intercambiar</Text>
+            </Pressable>
           </View>
 
           <View style={styles.countryNavigator}>
@@ -1048,28 +1096,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 24,
   },
-  shareAlbumBtn: {
-    flexDirection: 'row',
+  iconTooltip: {
+    position: 'absolute',
+    bottom: 48,
+    left: '50%',
+    transform: [{ translateX: -60 }],
+    width: 120,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    borderRadius: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255,214,0,0.12)',
-    borderColor: '#FFD600',
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
   },
-  shareAlbumIcon: {
-    color: '#FFD600',
-    fontSize: 13,
-    fontWeight: '900',
-    lineHeight: 16,
-  },
-  shareAlbumText: {
-    color: '#FFD600',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.3,
+  iconTooltipText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   searchCardMobile: {
     flexDirection: 'row',
@@ -1257,39 +1300,26 @@ const styles = StyleSheet.create({
   pagerNavRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.md,
-    paddingTop: spacing.sm,
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
   },
-  pagerProgressCol: {
-    flex: 1,
-    alignItems: 'stretch',
-    gap: 6,
+  pagerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  pagerProgressLabel: {
+  pagerLabel: {
     color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontSize: 12,
+    fontWeight: '700',
+    minWidth: 28,
     textAlign: 'center',
-    textTransform: 'uppercase',
-  },
-  pagerProgressTrack: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 4,
-    height: 6,
-    overflow: 'hidden',
-    width: '100%',
-  },
-  pagerProgressFill: {
-    height: '100%',
-    borderRadius: 4,
   },
   pagerChevron: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.md,
+    width: 28,
+    height: 28,
+    borderRadius: radii.sm,
     backgroundColor: '#1A1A1A',
     borderColor: '#333',
     borderWidth: 1,
@@ -1301,9 +1331,23 @@ const styles = StyleSheet.create({
   },
   pagerChevronText: {
     color: '#FFFFFF',
-    fontSize: 22,
+    fontSize: 16,
     fontWeight: '900',
-    lineHeight: 24,
+    lineHeight: 18,
+  },
+  tradeFab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.lg,
+  },
+  tradeFabText: {
+    color: colors.background,
+    fontSize: 13,
+    fontWeight: '700',
   },
 
   // ----- COMPARTIDO -----
